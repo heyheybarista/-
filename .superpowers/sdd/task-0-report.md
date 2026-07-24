@@ -62,4 +62,4 @@ DONE
    - Set up FastAPI with lifespan, CORS, session middleware
    - Added static file serving, scripts, and configuration
 
-2. `6d58016` — docs: update task-0 report with commit hash
+2. `81a75d4` — docs: update task-0 report with commit hash
