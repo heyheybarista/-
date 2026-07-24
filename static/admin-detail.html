@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>会话详情 - 主试端</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <strong>会话详情</strong>
+  <div><a href="/admin-sessions.html">← 返回列表</a></div>
+</div>
+<div class="container">
+  <div class="card" id="meta-card"></div>
+  <div class="card" id="dialogue-card"><h3>对话内容</h3><div id="dialogue-body"></div></div>
+  <div class="card" style="display:flex;gap:12px;flex-wrap:wrap;">
+    <button class="btn btn-primary" id="copy-link-btn" onclick="copyLink()">复制被试链接</button>
+    <button class="btn" onclick="exportData('json')">导出 JSON</button>
+    <button class="btn" onclick="exportData('csv')">导出 CSV</button>
+    <button class="btn btn-danger" id="reset-btn" onclick="resetSession()">重置提交</button>
+  </div>
+</div>
+<script>
+const id = new URLSearchParams(location.search).get('id');
+let detail = null;
+
+async function load() {
+  if (!id) return;
+  const r = await fetch(`/api/admin/sessions/${id}`);
+  if (r.status === 401) { window.location.href = '/admin-login.html'; return; }
+  detail = await r.json();
+  render();
+}
+
+function render() {
+  const s = detail.session;
+  const statusMap = { created: '待打开', in_progress: '填写中', submitted: '已提交' };
+  document.getElementById('meta-card').innerHTML = `
+    <h3>会话信息</h3>
+    <p>被试编号：${esc(s.external_participant_id || '-')} | 标题：${esc(s.title || '-')} | 状态：${statusMap[s.status] || s.status}</p>
+    <p>创建：${new Date(s.created_at).toLocaleString('zh-CN')} | 提交：${s.submitted_at ? new Date(s.submitted_at).toLocaleString('zh-CN') : '-'}</p>
+  `;
+
+  const body = document.getElementById('dialogue-body');
+  body.innerHTML = detail.utterances.map(u => {
+    let t = u.target;
+    let annHtml = '';
+    if (t && t.annotation) {
+      annHtml = `<div style="margin-top:6px;padding:8px;background:#fefce8;border-radius:6px;font-size:13px;">
+        <strong>${esc(t.display_hint || t.label)}</strong>
+        · 类别：${esc(t.annotation.category || '-')}
+        · 描述：${esc(t.annotation.description || '-')}
+        · 置信度：${t.annotation.confidence || '-'}
+        · ${t.annotation.is_complete ? '✅完整' : '⚠未完成'}
+      </div>`;
+    } else if (t) {
+      annHtml = `<div style="margin-top:4px;font-size:12px;color:#d97706;">未填写 · ${esc(t.display_hint||t.label)}${t.required?' (必填)':''}</div>`;
+    }
+    const label = u.easyturn_label ? `<span class="badge badge-${u.easyturn_label}">${u.easyturn_label}</span>` : '';
+    const speaker = u.speaker === 'experimenter' ? '主试' : '被试';
+    return `<div class="utterance utterance-${u.speaker}">
+      <div class="speaker-label ${u.speaker}">${speaker} · #${u.seq}</div>
+      <p>${esc(u.text)}</p>${label}${annHtml}
+    </div>`;
+  }).join('');
+}
+
+async function copyLink() {
+  if (!detail) return;
+  await navigator.clipboard.writeText(detail.session.participant_url);
+  alert('链接已复制');
+}
+
+function exportData(fmt) {
+  window.open(`/api/admin/sessions/${id}/export?format=${fmt}`);
+}
+
+async function resetSession() {
+  if (!confirm('确认重置该会话？被试已填内容将被清空。')) return;
+  await fetch(`/api/admin/sessions/${id}/reset`, {method:'POST'});
+  alert('已重置');
+  load();
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+load();
+</script>
+</body>
+</html>

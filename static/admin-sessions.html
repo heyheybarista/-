@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>会话列表 - 主试端</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .nav { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .nav a { color: #2563eb; text-decoration: none; font-size: 14px; }
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  .status-dot.created { background: #9ca3af; }
+  .status-dot.in_progress { background: #f59e0b; }
+  .status-dot.submitted { background: #10b981; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <strong>主试端 · 会话列表</strong>
+  <div style="display:flex;gap:12px;align-items:center;">
+    <a href="/admin-sessions.html">列表</a>
+    <a href="/admin-settings.html">设置</a>
+    <a href="/admin-users.html">账号</a>
+    <a href="#" onclick="logout()">登出</a>
+  </div>
+</div>
+<div class="container">
+  <div class="nav">
+    <button class="btn btn-primary" onclick="refresh()">刷新</button>
+  </div>
+  <div class="card">
+    <table id="sessions-table">
+      <thead><tr><th>被试编号</th><th>标题</th><th>状态</th><th>进度</th><th>时间</th><th>操作</th></tr></thead>
+      <tbody id="sessions-body"></tbody>
+    </table>
+    <p id="empty-msg" style="display:none;color:#6b7280;text-align:center;padding:24px;">暂无会话。</p>
+  </div>
+</div>
+<script>
+function checkAuth() {
+  if (!sessionStorage.getItem('adminUser')) {
+    window.location.href = '/admin-login.html';
+  }
+}
+
+async function refresh() {
+  checkAuth();
+  try {
+    const r = await fetch('/api/admin/sessions');
+    if (r.status === 401) { window.location.href = '/admin-login.html'; return; }
+    const sessions = await r.json();
+    render(sessions);
+  } catch(e) { console.error(e); }
+}
+
+function render(sessions) {
+  const tbody = document.getElementById('sessions-body');
+  const empty = document.getElementById('empty-msg');
+  if (!sessions.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = sessions.map(s => {
+    const statusMap = { created: '待打开', in_progress: '填写中', submitted: '已提交' };
+    const dotClass = s.status;
+    const createdAt = new Date(s.created_at).toLocaleString('zh-CN');
+    return `<tr>
+      <td>${esc(s.external_participant_id || '-')}</td>
+      <td>${esc(s.title || '-')}</td>
+      <td><span class="status-dot ${dotClass}"></span>${statusMap[s.status] || s.status}</td>
+      <td>${s.completed_count}/${s.target_count}</td>
+      <td style="font-size:12px;">${createdAt}</td>
+      <td><a href="/admin-detail.html?id=${esc(s.id)}">详情</a></td>
+    </tr>`;
+  }).join('');
+}
+
+async function logout() {
+  await fetch('/api/admin/logout', {method:'POST'});
+  sessionStorage.removeItem('adminUser');
+  window.location.href = '/admin-login.html';
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+refresh();
+</script>
+</body>
+</html>

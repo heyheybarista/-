@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>主试登录</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .login-box { max-width: 360px; margin: 80px auto; }
+  .login-box input { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+  .error-msg { color: #dc2626; font-size: 13px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="login-box card">
+  <h2 style="text-align:center;margin-bottom:16px;">主试登录</h2>
+  <div class="error-msg" id="error" style="display:none;"></div>
+  <input id="username" placeholder="用户名" autocomplete="username">
+  <input id="password" type="password" placeholder="密码" autocomplete="current-password">
+  <button class="btn btn-primary" style="width:100%;" onclick="login()">登录</button>
+</div>
+<script>
+async function login() {
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value;
+  if (!u || !p) return;
+  try {
+    const r = await fetch('/api/admin/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username:u, password:p})
+    });
+    if (!r.ok) {
+      document.getElementById('error').textContent = '用户名或密码错误';
+      document.getElementById('error').style.display = 'block';
+      return;
+    }
+    const d = await r.json();
+    // Store in sessionStorage for frontend guard
+    sessionStorage.setItem('adminUser', JSON.stringify(d));
+    window.location.href = '/admin-sessions.html';
+  } catch(e) {
+    document.getElementById('error').textContent = '网络错误: ' + e.message;
+    document.getElementById('error').style.display = 'block';
+  }
+}
+</script>
+</body>
+</html>

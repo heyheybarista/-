@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>系统设置 - 主试端</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .setting-section { margin-bottom: 20px; }
+  .setting-section h3 { margin-bottom: 8px; }
+  textarea.wide { width: 100%; min-height: 200px; font-size: 14px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; }
+  .label-checkbox { display: inline-flex; align-items: center; gap: 4px; margin-right: 16px; }
+  .cat-row { display: flex; gap: 8px; margin-bottom: 6px; align-items: center; }
+  .cat-row input { padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <strong>系统设置</strong>
+  <div><a href="/admin-sessions.html">← 返回列表</a></div>
+</div>
+<div class="container">
+  <div class="card setting-section">
+    <h3>指导语</h3>
+    <textarea class="wide" id="instruction"></textarea>
+  </div>
+  <div class="card setting-section">
+    <h3>可标注标签</h3>
+    <div id="labels-checkboxes"></div>
+  </div>
+  <div class="card setting-section">
+    <h3>原因类别</h3>
+    <div id="categories-list"></div>
+    <button class="btn" onclick="addCategoryRow()">+ 添加类别</button>
+  </div>
+  <button class="btn btn-primary" onclick="save()">保存设置</button>
+  <span id="save-status" style="margin-left:12px;font-size:13px;"></span>
+</div>
+<script>
+const ALL_LABELS = ['incomplete','wait','complete','backchannel'];
+const LABEL_NAMES = {incomplete:'未说完', wait:'等待', complete:'完整', backchannel:'附和'};
+
+async function load() {
+  const r = await fetch('/api/admin/settings');
+  if (r.status === 401) { window.location.href = '/admin-login.html'; return; }
+  const s = await r.json();
+  document.getElementById('instruction').value = s.instruction_text || '';
+
+  // labels
+  document.getElementById('labels-checkboxes').innerHTML = ALL_LABELS.map(l =>
+    `<label class="label-checkbox"><input type="checkbox" value="${l}" ${s.annotatable_labels.includes(l)?'checked':''}>${LABEL_NAMES[l]||l} (${l})</label>`
+  ).join('');
+
+  // categories
+  window._cats = s.reason_categories || [];
+  renderCategories();
+}
+
+function renderCategories() {
+  document.getElementById('categories-list').innerHTML = window._cats.map((c,i) =>
+    `<div class="cat-row">
+      <input placeholder="value" value="${esc(c.value)}" data-idx="${i}" class="cat-val" style="width:120px;">
+      <input placeholder="显示名" value="${esc(c.label)}" data-idx="${i}" class="cat-label" style="flex:1;">
+      <button class="btn" onclick="removeCat(${i})" style="font-size:12px;">删除</button>
+    </div>`
+  ).join('');
+}
+
+function addCategoryRow() {
+  window._cats.push({value:'', label:''});
+  renderCategories();
+}
+
+function removeCat(i) { window._cats.splice(i,1); renderCategories(); }
+
+function collectCategories() {
+  const rows = document.querySelectorAll('.cat-row');
+  return Array.from(rows).map(r => ({
+    value: r.querySelector('.cat-val').value.trim(),
+    label: r.querySelector('.cat-label').value.trim(),
+  })).filter(c => c.value && c.label);
+}
+
+async function save() {
+  if (!confirm('确认保存设置？')) return;
+  const labels = Array.from(document.querySelectorAll('#labels-checkboxes input:checked')).map(cb=>cb.value);
+  const instruction = document.getElementById('instruction').value;
+  const reason_categories = collectCategories();
+  const r = await fetch('/api/admin/settings', {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ instruction_text: instruction, annotatable_labels: labels, reason_categories })
+  });
+  if (r.ok) {
+    document.getElementById('save-status').textContent = '已保存';
+    document.getElementById('save-status').style.color = '#059669';
+  } else {
+    document.getElementById('save-status').textContent = '保存失败';
+    document.getElementById('save-status').style.color = '#dc2626';
+  }
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+load();
+</script>
+</body>
+</html>
