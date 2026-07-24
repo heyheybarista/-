@@ -56,8 +56,10 @@ DONE
 
 ## 6. Commits
 
-1. `c346d18` — feat: initialize project skeleton with FastAPI backend
+1. `bb6508f` — feat: initialize project skeleton with FastAPI backend
    - 21 files created, 580 insertions
    - Created all app modules, models, schemas, auth, utils
    - Set up FastAPI with lifespan, CORS, session middleware
    - Added static file serving, scripts, and configuration
+
+2. `6d58016` — docs: update task-0 report with commit hash
