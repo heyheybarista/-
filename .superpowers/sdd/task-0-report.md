@@ -63,3 +63,5 @@ DONE
    - Added static file serving, scripts, and configuration
 
 2. `81a75d4` — docs: update task-0 report with commit hash
+
+3. `09842f5` — docs: fix commit hash in task-0 report
