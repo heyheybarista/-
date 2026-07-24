@@ -2,6 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from app.config import get_settings
@@ -31,6 +32,11 @@ app.include_router(admin.router, prefix="/api")
 async def health():
     return {"status": "ok"}
 
+
+# Participant page — serve participant.html at /a/{token} so the frontend JS can parse the token from the URL path
+@app.get("/a/{token:path}")
+async def serve_participant_page(token: str):
+    return FileResponse(os.path.join(STATIC_DIR, "participant.html"))
 
 # Static files (frontend) — keep after all routes so routes take priority
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

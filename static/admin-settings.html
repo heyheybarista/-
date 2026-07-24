@@ -37,12 +37,18 @@
   <span id="save-status" style="margin-left:12px;font-size:13px;"></span>
 </div>
 <script>
+function checkAuth() {
+  if (!sessionStorage.getItem('adminUser')) {
+    window.location.href = '/admin-login.html';
+  }
+}
+
 const ALL_LABELS = ['incomplete','wait','complete','backchannel'];
 const LABEL_NAMES = {incomplete:'未说完', wait:'等待', complete:'完整', backchannel:'附和'};
 
 async function load() {
+  checkAuth();
   const r = await fetch('/api/admin/settings');
-  if (r.status === 401) { window.location.href = '/admin-login.html'; return; }
   const s = await r.json();
   document.getElementById('instruction').value = s.instruction_text || '';
 

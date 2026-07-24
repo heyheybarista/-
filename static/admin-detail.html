@@ -38,7 +38,7 @@ function render() {
   const statusMap = { created: '待打开', in_progress: '填写中', submitted: '已提交' };
   document.getElementById('meta-card').innerHTML = `
     <h3>会话信息</h3>
-    <p>被试编号：${esc(s.external_participant_id || '-')} | 标题：${esc(s.title || '-')} | 状态：${statusMap[s.status] || s.status}</p>
+    <p>被试编号：${esc(s.external_participant_id || '-')} | 标题：${esc(s.title || '-')} | 状态：${esc(statusMap[s.status] || s.status)}</p>
     <p>创建：${new Date(s.created_at).toLocaleString('zh-CN')} | 提交：${s.submitted_at ? new Date(s.submitted_at).toLocaleString('zh-CN') : '-'}</p>
   `;
 
@@ -57,10 +57,10 @@ function render() {
     } else if (t) {
       annHtml = `<div style="margin-top:4px;font-size:12px;color:#d97706;">未填写 · ${esc(t.display_hint||t.label)}${t.required?' (必填)':''}</div>`;
     }
-    const label = u.easyturn_label ? `<span class="badge badge-${u.easyturn_label}">${u.easyturn_label}</span>` : '';
+    const label = u.easyturn_label ? `<span class="badge badge-${esc(u.easyturn_label)}">${esc(u.easyturn_label)}</span>` : '';
     const speaker = u.speaker === 'experimenter' ? '主试' : '被试';
-    return `<div class="utterance utterance-${u.speaker}">
-      <div class="speaker-label ${u.speaker}">${speaker} · #${u.seq}</div>
+    return `<div class="utterance utterance-${esc(u.speaker)}">
+      <div class="speaker-label ${esc(u.speaker)}">${speaker} · #${u.seq}</div>
       <p>${esc(u.text)}</p>${label}${annHtml}
     </div>`;
   }).join('');

@@ -181,6 +181,7 @@ async def reset_session(
         await db.execute(delete(Annotation).where(Annotation.target_id == t.id))
     s.status = "in_progress"
     s.submitted_at = None
+    s.opened_at = None
     await db.commit()
     return {"ok": True, "status": s.status}
 
