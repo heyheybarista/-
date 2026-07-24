@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>停顿回溯标注</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .instruction-card { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .instruction-card summary { font-weight: 700; cursor: pointer; font-size: 15px; }
+  .instruction-body { margin-top: 8px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+  .save-status { font-size: 12px; color: #6b7280; }
+  .save-status.saved { color: #059669; }
+  .save-status.saving { color: #d97706; }
+  .save-status.error { color: #dc2626; }
+  .speaker-label { font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+  .speaker-label.experimenter { color: #4b5563; }
+  .speaker-label.participant { color: #2563eb; }
+</style>
+</head>
+<body>
+<div class="topbar" id="topbar">
+  <div>
+    <strong id="title-display">停顿回溯标注</strong>
+    <span class="save-status saved" id="save-status">已保存</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span style="font-size:14px;" id="progress-text">0/0</span>
+    <progress id="progress-bar" value="0" max="100" style="width:120px;"></progress>
+    <button class="btn btn-primary" id="submit-btn" disabled>提交</button>
+  </div>
+</div>
+
+<div class="container" id="app">
+  <div class="card" id="loading">加载中…</div>
+</div>
+
+<script>
+const TOKEN = window.location.pathname.split('/').pop();
+let sessionData = null;
+let debounceTimers = {};
+
+// ── API helpers ──────────────────────────────────
+const api = {
+  async get() {
+    const r = await fetch(`/api/a/${TOKEN}`);
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async patch(targetId, body) {
+    const r = await fetch(`/api/a/${TOKEN}/annotations/${targetId}`, {
+      method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async submit() {
+    const r = await fetch(`/api/a/${TOKEN}/submit`, { method: 'POST' });
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(typeof err.detail === 'object' ? JSON.stringify(err.detail) : err.detail);
+    }
+    return r.json();
+  }
+};
+
+// ── Save status ─────────────────────────────────
+function setSaveStatus(state) {
+  const el = document.getElementById('save-status');
+  el.className = 'save-status ' + state;
+  el.textContent = {saved:'已保存', saving:'保存中…', error:'保存失败'}[state] || state;
+}
+
+function autoSave(targetId, field, value) {
+  setSaveStatus('saving');
+  clearTimeout(debounceTimers[targetId + field]);
+  debounceTimers[targetId + field] = setTimeout(async () => {
+    try {
+      await api.patch(targetId, { [field]: value });
+      setSaveStatus('saved');
+      updateProgress();
+    } catch(e) {
+      setSaveStatus('error');
+      console.error(e);
+    }
+  }, field === 'confidence' ? 0 : 800);
+}
+
+// ── Progress ────────────────────────────────────
+function updateProgress() {
+  const targets = document.querySelectorAll('.annotation-form');
+  let done = 0;
+  targets.forEach(f => {
+    const cat = f.querySelector('select')?.value;
+    const desc = f.querySelector('textarea')?.value.trim();
+    const conf = f.querySelector('.confidence-btn.selected')?.dataset?.value;
+    if (cat && desc && conf) done++;
+  });
+  const total = targets.length;
+  document.getElementById('progress-text').textContent = `${done}/${total}`;
+  document.getElementById('progress-bar').value = total ? (done / total) * 100 : 0;
+  document.getElementById('submit-btn').disabled = done < total;
+}
+
+// ── Render ──────────────────────────────────────
+function render(data) {
+  sessionData = data;
+  document.getElementById('title-display').textContent = data.title || '停顿回溯标注';
+
+  const isReadonly = data.status === 'submitted';
+
+  let html = '';
+
+  // Instruction
+  if (data.instruction) {
+    html += `<details class="instruction-card" open>
+      <summary>📋 填写说明</summary>
+      <div class="instruction-body">${escapeHtml(data.instruction)}</div>
+    </details>`;
+  }
+
+  // Dialogue
+  if (!data.utterances || data.utterances.length === 0) {
+    html += '<div class="card"><p>暂无对话数据。</p></div>';
+  } else {
+    html += '<div class="card">';
+    for (const u of data.utterances) {
+      const speakerClass = u.speaker === 'experimenter' ? 'experimenter' : 'participant';
+      const speakerName = u.speaker === 'experimenter' ? '主试' : '被试';
+      html += `<div class="utterance utterance-${speakerClass}">
+        <div class="speaker-label ${speakerClass}">${speakerName} · #${u.seq}</div>
+        <p>${escapeHtml(u.text)}</p>`;
+
+      // Badge
+      if (u.easyturn_label) {
+        html += `<span class="badge badge-${u.easyturn_label}">${u.easyturn_label}</span>`;
+      }
+      if (u.pause_duration_ms) {
+        html += ` <span style="font-size:12px;color:#6b7280;">约 ${(u.pause_duration_ms/1000).toFixed(1)}s</span>`;
+      }
+
+      // Annotation form if target exists
+      if (u.annotation_target) {
+        const t = u.annotation_target;
+        const ann = t.annotation || {};
+        html += renderAnnotationForm(t, ann, isReadonly);
+      }
+
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  // Submitted notice
+  if (isReadonly) {
+    html = '<div class="card" style="background:#d1fae5;border:1px solid #059669;text-align:center;margin-bottom:16px;">✅ 你已于 ' + (data.status === 'submitted' ? '提交完成' : '') + '。以下为只读查看。</div>' + html;
+  }
+
+  document.getElementById('app').innerHTML = html;
+
+  // Bind events
+  if (!isReadonly) {
+    document.querySelectorAll('.annotation-form').forEach(form => {
+      const targetId = form.dataset.targetId;
+      form.querySelector('select').addEventListener('change', e => {
+        autoSave(targetId, 'category', e.target.value);
+      });
+      form.querySelector('textarea').addEventListener('input', e => {
+        autoSave(targetId, 'description', e.target.value);
+      });
+      form.querySelectorAll('.confidence-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          form.querySelectorAll('.confidence-btn').forEach(b => b.classList.remove('selected'));
+          btn.classList.add('selected');
+          autoSave(targetId, 'confidence', parseInt(btn.dataset.value));
+        });
+      });
+    });
+    document.getElementById('submit-btn').addEventListener('click', handleSubmit);
+  }
+
+  updateProgress();
+}
+
+function renderAnnotationForm(target, ann, readonly) {
+  const categories = JSON.parse(document.getElementById('categories-data')?.textContent || '[]');
+  const catOptions = categories.map(c =>
+    `<option value="${escapeHtml(c.value)}" ${ann.category === c.value ? 'selected' : ''}>${escapeHtml(c.label)}</option>`
+  ).join('');
+
+  const confHtml = [1,2,3,4,5,6,7].map(v =>
+    `<button type="button" class="confidence-btn ${ann.confidence === v ? 'selected' : ''}" data-value="${v}" ${readonly?'disabled':''}>${v}</button>`
+  ).join('');
+
+  return `<div class="annotation-form" data-target-id="${target.id}">
+    <div style="font-size:12px;color:#92400e;margin-bottom:6px;">🏷 标记：<strong>${escapeHtml(target.display_hint || target.label)}</strong>${target.required ? '（必填）' : ''}</div>
+    <label>原因类别</label>
+    <select ${readonly?'disabled':''}>${catOptions}</select>
+    <label>原因与心理过程</label>
+    <textarea rows="3" placeholder="请描述当时停顿的原因…" ${readonly?'disabled':''}>${escapeHtml(ann.description || '')}</textarea>
+    <label>置信度：你在多大程度上确信该停顿原因的描述？</label>
+    <div class="confidence-row">${confHtml}</div>
+  </div>`;
+}
+
+async function handleSubmit() {
+  if (!confirm('确认提交？提交后不可再修改。')) return;
+  try {
+    await api.submit();
+    alert('提交成功！');
+    location.reload();
+  } catch(e) {
+    alert('提交失败：' + e.message);
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+// ── Init ─────────────────────────────────────────
+(async () => {
+  try {
+    // load categories from settings (fetched via session metadata or separate call)
+    // We embed them via a small inline fetch
+    const catResp = await fetch('/api/admin/settings');
+    let categories = [];
+    if (catResp.ok) {
+      const settings = await catResp.json();
+      categories = settings.reason_categories || [];
+    }
+    // embed categories for render function
+    const script = document.createElement('script');
+    script.id = 'categories-data';
+    script.type = 'application/json';
+    script.textContent = JSON.stringify(categories);
+    document.head.appendChild(script);
+
+    const data = await api.get();
+    render(data);
+  } catch(e) {
+    document.getElementById('app').innerHTML = `<div class="card" style="color:#dc2626;">加载失败：${escapeHtml(e.message)}<br>请确认链接正确且已由主试创建会话。</div>`;
+  }
+})();
+</script>
+</body>
+</html>
