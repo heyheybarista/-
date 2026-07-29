@@ -38,7 +38,7 @@ async def get_db() -> AsyncSession:
 
 async def create_demo_session_if_missing():
     """Create a fixed demo session on startup if it doesn't exist"""
-    from app.models import Session, Utterance, AnnotationTarget, SystemSettings
+    from app.models import Session, Utterance, AnnotationTarget
     from app.utils import generate_session_token
     from app.config import get_settings
 
@@ -55,19 +55,15 @@ async def create_demo_session_if_missing():
         if existing:
             return  # Demo session already exists
 
-        # Get current system settings for instructions
-        settings_result = await db.execute(select(SystemSettings).limit(1))
-        sys_settings = settings_result.scalar_one_or_none()
-        instructions = sys_settings.instructions if sys_settings else "请根据标记填写停顿原因。"
-
         # Create demo session
         token = generate_session_token()
         demo_session = Session(
             external_participant_id="DEMO001",
             title="【演示会话】口语任务",
-            token=token,
-            instructions_snapshot=instructions,
-            status="pending"
+            access_token=token,
+            instruction_snapshot="请根据每个标记填写停顿原因，包括原因类别、心理过程描述和置信度。",
+            status="created",
+            annotatable_labels=["incomplete", "wait"]
         )
         db.add(demo_session)
         await db.flush()
@@ -86,28 +82,32 @@ async def create_demo_session_if_missing():
             {"seq": 10, "speaker": "experimenter", "text": "听起来很有趣", "easyturn_label": "complete"}
         ]
 
-        annotatable_labels = ["incomplete", "wait"]
-
-        # Create utterances and annotation targets
+        # Create utterances
+        utterance_objs = {}
         for ut_data in utterances_data:
             utt = Utterance(
                 session_id=demo_session.id,
                 seq=ut_data["seq"],
                 speaker=ut_data["speaker"],
                 text=ut_data["text"],
-                easyturn_label=ut_data.get("easyturn_label"),
-                pause_duration_ms=ut_data.get("pause_duration_ms")
+                easyturn_label=ut_data.get("easyturn_label")
             )
             db.add(utt)
+            await db.flush()  # Get the ID
+            utterance_objs[ut_data["seq"]] = utt
 
-            # Create annotation target if label is annotatable
+        # Create annotation targets for annotatable labels
+        annotatable_labels = ["incomplete", "wait"]
+        for ut_data in utterances_data:
             label = ut_data.get("easyturn_label")
             if label in annotatable_labels:
+                utt = utterance_objs[ut_data["seq"]]
                 target = AnnotationTarget(
                     session_id=demo_session.id,
-                    utterance_seq=ut_data["seq"],
+                    utterance_id=utt.id,
                     label=label,
-                    required=True
+                    required=True,
+                    pause_duration_ms=ut_data.get("pause_duration_ms")
                 )
                 db.add(target)
 
