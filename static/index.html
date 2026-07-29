@@ -5,11 +5,76 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>停顿回溯标注工具</title>
 <link rel="stylesheet" href="/css/style.css">
+<meta http-equiv="refresh" content="0; url=/admin-login.html">
+<style>
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  .welcome-box {
+    background: white;
+    padding: 3rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    text-align: center;
+    max-width: 500px;
+  }
+  .welcome-box h1 {
+    color: #333;
+    margin-bottom: 1rem;
+    font-size: 1.8rem;
+  }
+  .welcome-box p {
+    color: #666;
+    margin-bottom: 2rem;
+    font-size: 1rem;
+  }
+  .btn {
+    display: inline-block;
+    padding: 0.8rem 2rem;
+    background: #667eea;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.3s;
+    margin: 0.5rem;
+  }
+  .btn:hover {
+    background: #5568d3;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+  }
+  .redirect-info {
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+    color: #999;
+  }
+</style>
 </head>
 <body>
-<div class="container">
-  <h1>停顿回溯标注工具</h1>
-  <p>加载中...</p>
+<div class="welcome-box">
+  <h1>📝 停顿回溯标注工具</h1>
+  <p>正在跳转到主试端登录页...</p>
+  <div>
+    <a href="/admin-login.html" class="btn">👨‍🏫 主试端登录</a>
+  </div>
+  <div class="redirect-info">
+    如果没有自动跳转，请点击上方按钮
+  </div>
 </div>
+<script>
+  // 3秒后如果还没跳转，显示提示
+  setTimeout(() => {
+    if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+      window.location.href = '/admin-login.html';
+    }
+  }, 100);
+</script>
 </body>
 </html>
