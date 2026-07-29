@@ -1,0 +1,30 @@
+{
+  "utterances": [
+    {
+      "seq": 1,
+      "speaker": "experimenter",
+      "text": "你有没有发生过一些童年趣事呀",
+      "easyturn_label": "complete"
+    },
+    {
+      "seq": 2,
+      "speaker": "participant",
+      "text": "因为小时候",
+      "easyturn_label": "incomplete",
+      "pause_duration_ms": 800
+    },
+    {
+      "seq": 3,
+      "speaker": "participant",
+      "text": "我小时候有一次",
+      "easyturn_label": "wait",
+      "pause_duration_ms": 1200
+    },
+    {
+      "seq": 4,
+      "speaker": "participant",
+      "text": "去公园玩的时候摔倒了",
+      "easyturn_label": "complete"
+    }
+  ]
+}
