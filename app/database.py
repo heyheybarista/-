@@ -39,7 +39,7 @@ async def get_db() -> AsyncSession:
 async def create_demo_session_if_missing():
     """Create a fixed demo session on startup if it doesn't exist"""
     from app.models import Session, Utterance, AnnotationTarget
-    from app.utils import generate_session_token
+    from app.utils import generate_token
     from app.config import get_settings
 
     settings = get_settings()
@@ -56,7 +56,7 @@ async def create_demo_session_if_missing():
             return  # Demo session already exists
 
         # Create demo session
-        token = generate_session_token()
+        token = generate_token()
         demo_session = Session(
             external_participant_id="DEMO001",
             title="【演示会话】口语任务",
