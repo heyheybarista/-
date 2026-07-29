@@ -248,7 +248,7 @@ function renderAnnotationForm(target, ann, readonly) {
     <select ${readonly?'disabled':''}>${catOptions}</select>
     <label>原因与心理过程</label>
     <textarea rows="3" placeholder="请描述当时停顿的原因…" ${readonly?'disabled':''}>${escapeHtml(ann.description || '')}</textarea>
-    <label>置信度：你在多大程度上确信该停顿原因的描述？</label>
+    <label>你在多大程度上确信该停顿原因的描述？1=完全不确信，7=完全确信</label>
     <div class="confidence-row">${confHtml}</div>
   </div>`;
 }
