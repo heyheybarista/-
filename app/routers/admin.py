@@ -186,6 +186,29 @@ async def reset_session(
     return {"ok": True, "status": s.status}
 
 
+@router.delete("/admin/sessions/{session_id}")
+async def delete_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: Experimenter = Depends(get_current_user),
+):
+    """永久删除一场会话及其话语、标注目标与填写内容。"""
+    s = (await db.execute(select(Session).where(Session.id == session_id))).scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    targets = (await db.execute(
+        select(AnnotationTarget).where(AnnotationTarget.session_id == session_id)
+    )).scalars().all()
+    for t in targets:
+        await db.execute(delete(Annotation).where(Annotation.target_id == t.id))
+    await db.execute(delete(AnnotationTarget).where(AnnotationTarget.session_id == session_id))
+    await db.execute(delete(Utterance).where(Utterance.session_id == session_id))
+    await db.execute(delete(Session).where(Session.id == session_id))
+    await db.commit()
+    return {"ok": True, "deleted": session_id}
+
+
 @router.get("/admin/sessions/{session_id}/export")
 async def export_session(
     session_id: str,

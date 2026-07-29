@@ -5,6 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>会话详情 - 主试端</title>
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  .link-box {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .link-box input {
+    flex: 1;
+    min-width: 220px;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #f9fafb;
+  }
+  .link-box .btn { white-space: nowrap; }
+</style>
 </head>
 <body>
 <div class="topbar">
@@ -19,6 +38,7 @@
     <button class="btn" onclick="exportData('json')">导出 JSON</button>
     <button class="btn" onclick="exportData('csv')">导出 CSV</button>
     <button class="btn btn-danger" id="reset-btn" onclick="resetSession()">重置提交</button>
+    <button class="btn btn-danger" id="delete-btn" onclick="deleteSession()">删除会话</button>
   </div>
 </div>
 <script>
@@ -36,10 +56,17 @@ async function load() {
 function render() {
   const s = detail.session;
   const statusMap = { created: '待打开', in_progress: '填写中', submitted: '已提交' };
+  const url = s.participant_url || '';
   document.getElementById('meta-card').innerHTML = `
     <h3>会话信息</h3>
     <p>被试编号：${esc(s.external_participant_id || '-')} | 标题：${esc(s.title || '-')} | 状态：${esc(statusMap[s.status] || s.status)}</p>
     <p>创建：${new Date(s.created_at).toLocaleString('zh-CN')} | 提交：${s.submitted_at ? new Date(s.submitted_at).toLocaleString('zh-CN') : '-'}</p>
+    <p style="margin-top:8px;font-weight:600;">被试链接</p>
+    <div class="link-box">
+      <input id="participant-url-input" type="text" readonly value="${esc(url)}" onclick="this.select()">
+      <button class="btn btn-primary" type="button" onclick="copyLink()">复制链接</button>
+    </div>
+    <p style="margin-top:6px;font-size:12px;color:#6b7280;">若一键复制失败，请点选上方链接后手动 Ctrl+C / 长按复制。</p>
   `;
 
   const body = document.getElementById('dialogue-body');
@@ -51,7 +78,7 @@ function render() {
         <strong>${esc(t.display_hint || t.label)}</strong>
         · 类别：${esc(t.annotation.category || '-')}
         · 描述：${esc(t.annotation.description || '-')}
-        · 置信度：${t.annotation.confidence || '-'}
+        · 置信度：${t.annotation.confidence != null ? t.annotation.confidence : '-'}
         · ${t.annotation.is_complete ? '✅完整' : '⚠未完成'}
       </div>`;
     } else if (t) {
@@ -66,10 +93,43 @@ function render() {
   }).join('');
 }
 
+async function copyText(text) {
+  if (!text) throw new Error('链接为空');
+  // Prefer Clipboard API when available (HTTPS / localhost)
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  // Fallback for HTTP LAN pages (clipboard API often blocked)
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  ta.style.top = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, ta.value.length);
+  const ok = document.execCommand('copy');
+  document.body.removeChild(ta);
+  if (!ok) throw new Error('浏览器不允许自动复制');
+}
+
 async function copyLink() {
   if (!detail) return;
-  await navigator.clipboard.writeText(detail.session.participant_url);
-  alert('链接已复制');
+  const url = detail.session.participant_url || document.getElementById('participant-url-input')?.value || '';
+  try {
+    await copyText(url);
+    alert('链接已复制');
+  } catch (e) {
+    const input = document.getElementById('participant-url-input');
+    if (input) {
+      input.focus();
+      input.select();
+    }
+    alert('自动复制失败，已选中链接，请手动复制（Ctrl+C）。\n\n' + url);
+  }
 }
 
 function exportData(fmt) {
@@ -81,6 +141,15 @@ async function resetSession() {
   await fetch(`/api/admin/sessions/${id}/reset`, {method:'POST'});
   alert('已重置');
   load();
+}
+
+async function deleteSession() {
+  if (!confirm('确认永久删除该会话？删除后不可恢复。')) return;
+  const r = await fetch(`/api/admin/sessions/${id}`, {method:'DELETE'});
+  if (r.status === 401) { window.location.href = '/admin-login.html'; return; }
+  if (!r.ok) { alert('删除失败'); return; }
+  alert('已删除');
+  window.location.href = '/admin-sessions.html';
 }
 
 function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }

@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: pause-annotation-tool
+    runtime: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        fromService:
+          type: web
+          name: pause-annotation-tool
+          property: port
+      - key: PUBLIC_BASE_URL
+        fromService:
+          type: web
+          name: pause-annotation-tool
+          property: url
+      - key: PIPELINE_TOKEN
+        generateValue: true
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_PATH
+        value: /data/app.db
+    disk:
+      name: pause-annotation-data
+      mountPath: /data
+      sizeGB: 1

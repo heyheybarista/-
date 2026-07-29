@@ -6,12 +6,23 @@
 <title>会话列表 - 主试端</title>
 <link rel="stylesheet" href="/css/style.css">
 <style>
-  .nav { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .nav { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
   .nav a { color: #2563eb; text-decoration: none; font-size: 14px; }
   .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
   .status-dot.created { background: #9ca3af; }
   .status-dot.in_progress { background: #f59e0b; }
   .status-dot.submitted { background: #10b981; }
+  .ops a, .ops button {
+    margin-right: 8px;
+    font-size: 13px;
+    background: none;
+    border: none;
+    color: #2563eb;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+  }
+  .ops button.danger { color: #dc2626; }
 </style>
 </head>
 <body>
@@ -27,6 +38,7 @@
 <div class="container">
   <div class="nav">
     <button class="btn btn-primary" onclick="refresh()">刷新</button>
+    <button class="btn btn-danger" onclick="deleteIncomplete()">清理未提交测试会话</button>
   </div>
   <div class="card">
     <table id="sessions-table">
@@ -37,6 +49,8 @@
   </div>
 </div>
 <script>
+let lastSessions = [];
+
 function checkAuth() {
   if (!sessionStorage.getItem('adminUser')) {
     window.location.href = '/admin-login.html';
@@ -49,6 +63,7 @@ async function refresh() {
     const r = await fetch('/api/admin/sessions');
     if (r.status === 401) { window.location.href = '/admin-login.html'; return; }
     const sessions = await r.json();
+    lastSessions = sessions;
     render(sessions);
   } catch(e) { console.error(e); }
 }
@@ -68,9 +83,36 @@ function render(sessions) {
       <td><span class="status-dot ${dotClass}"></span>${statusMap[s.status] || s.status}</td>
       <td>${s.completed_count}/${s.target_count}</td>
       <td style="font-size:12px;">${createdAt}</td>
-      <td><a href="/admin-detail.html?id=${esc(s.id)}">详情</a></td>
+      <td class="ops">
+        <a href="/admin-detail.html?id=${esc(s.id)}">详情</a>
+        <button type="button" class="danger" onclick="deleteSession('${esc(s.id)}')">删除</button>
+      </td>
     </tr>`;
   }).join('');
+}
+
+async function deleteSession(id) {
+  if (!confirm('确认永久删除该会话？删除后不可恢复。')) return;
+  const r = await fetch(`/api/admin/sessions/${id}`, { method: 'DELETE' });
+  if (r.status === 401) { window.location.href = '/admin-login.html'; return; }
+  if (!r.ok) {
+    alert('删除失败');
+    return;
+  }
+  refresh();
+}
+
+async function deleteIncomplete() {
+  const targets = lastSessions.filter(s => s.status !== 'submitted');
+  if (!targets.length) {
+    alert('没有可清理的未提交会话。');
+    return;
+  }
+  if (!confirm(`将删除 ${targets.length} 条未提交会话（保留已提交），确认？`)) return;
+  for (const s of targets) {
+    await fetch(`/api/admin/sessions/${s.id}`, { method: 'DELETE' });
+  }
+  refresh();
 }
 
 async function logout() {

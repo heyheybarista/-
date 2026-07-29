@@ -39,6 +39,8 @@
 const TOKEN = window.location.pathname.split('/').pop();
 let sessionData = null;
 let debounceTimers = {};
+// Pending save promises keyed by targetId+field, so submit can flush them first
+const pendingSaves = {};
 
 // ── API helpers ──────────────────────────────────
 const api = {
@@ -58,7 +60,12 @@ const api = {
     const r = await fetch(`/api/a/${TOKEN}/submit`, { method: 'POST' });
     if (!r.ok) {
       const err = await r.json();
-      throw new Error(typeof err.detail === 'object' ? JSON.stringify(err.detail) : err.detail);
+      const detail = err.detail;
+      if (detail && typeof detail === 'object' && detail.incomplete) {
+        const hints = detail.incomplete.map(x => x.display_hint || x.target_id).join('、');
+        throw new Error(`还有未完成的标记：${hints}。请检查类别、描述和置信度是否都已填写并保存。`);
+      }
+      throw new Error(typeof detail === 'object' ? JSON.stringify(detail) : (detail || '提交失败'));
     }
     return r.json();
   }
@@ -74,16 +81,56 @@ function setSaveStatus(state) {
 function autoSave(targetId, field, value) {
   setSaveStatus('saving');
   clearTimeout(debounceTimers[targetId + field]);
-  debounceTimers[targetId + field] = setTimeout(async () => {
-    try {
-      await api.patch(targetId, { [field]: value });
-      setSaveStatus('saved');
-      updateProgress();
-    } catch(e) {
-      setSaveStatus('error');
-      console.error(e);
+  const key = targetId + field;
+  const delay = field === 'confidence' ? 0 : 800;
+  const p = new Promise((resolve, reject) => {
+    debounceTimers[key] = setTimeout(async () => {
+      try {
+        await api.patch(targetId, { [field]: value });
+        setSaveStatus('saved');
+        updateProgress();
+        resolve();
+      } catch(e) {
+        setSaveStatus('error');
+        console.error(e);
+        reject(e);
+      } finally {
+        delete pendingSaves[key];
+      }
+    }, delay);
+  });
+  pendingSaves[key] = p;
+}
+
+async function flushPendingSaves() {
+  // Cancel debounce timers and fire immediate saves for any pending form values
+  document.querySelectorAll('.annotation-form').forEach(form => {
+    const targetId = form.dataset.targetId;
+    const cat = form.querySelector('select')?.value;
+    const desc = form.querySelector('textarea')?.value.trim();
+    const conf = form.querySelector('.confidence-btn.selected')?.dataset?.value;
+    // Clear pending timers and force immediate PATCH of current values
+    ['category', 'description', 'confidence'].forEach(field => {
+      const key = targetId + field;
+      clearTimeout(debounceTimers[key]);
+      delete debounceTimers[key];
+    });
+    if (cat) {
+      pendingSaves[targetId + 'category'] = api.patch(targetId, { category: cat });
     }
-  }, field === 'confidence' ? 0 : 800);
+    if (desc) {
+      pendingSaves[targetId + 'description'] = api.patch(targetId, { description: desc });
+    }
+    if (conf) {
+      pendingSaves[targetId + 'confidence'] = api.patch(targetId, { confidence: parseInt(conf) });
+    }
+  });
+  const pending = Object.values(pendingSaves);
+  if (pending.length) {
+    setSaveStatus('saving');
+    await Promise.all(pending);
+    setSaveStatus('saved');
+  }
 }
 
 // ── Progress ────────────────────────────────────
@@ -94,6 +141,7 @@ function updateProgress() {
     const cat = f.querySelector('select')?.value;
     const desc = f.querySelector('textarea')?.value.trim();
     const conf = f.querySelector('.confidence-btn.selected')?.dataset?.value;
+    // cat must be a real selection (not empty placeholder)
     if (cat && desc && conf) done++;
   });
   const total = targets.length;
@@ -184,7 +232,9 @@ function render(data) {
 
 function renderAnnotationForm(target, ann, readonly) {
   const categories = JSON.parse(document.getElementById('categories-data')?.textContent || '[]');
-  const catOptions = categories.map(c =>
+  // Placeholder so the first real category is NOT auto-selected without user action
+  const placeholder = `<option value="" ${ann.category ? '' : 'selected'} disabled>请选择类别…</option>`;
+  const catOptions = placeholder + categories.map(c =>
     `<option value="${escapeHtml(c.value)}" ${ann.category === c.value ? 'selected' : ''}>${escapeHtml(c.label)}</option>`
   ).join('');
 
@@ -205,12 +255,17 @@ function renderAnnotationForm(target, ann, readonly) {
 
 async function handleSubmit() {
   if (!confirm('确认提交？提交后不可再修改。')) return;
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
   try {
+    // Flush any pending debounced saves before submitting
+    await flushPendingSaves();
     await api.submit();
     alert('提交成功！');
     location.reload();
   } catch(e) {
     alert('提交失败：' + e.message);
+    updateProgress(); // re-enable button if still complete
   }
 }
 
