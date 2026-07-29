@@ -23,7 +23,7 @@
 9. [如何打开被试端](#9-如何打开被试端)
 10. [被试如何填写与提交](#10-被试如何填写与提交)
 11. [流水线如何创建会话](#11-流水线如何创建会话)
-12. [局域网 / 公网部署说明](#12-局域网--公网部署说明)
+12. [局域网 / 公网部署说明](#12-局域网--公网部署说明)（含 [GitHub + Render 免费公网部署](#125-github--render-免费公网部署推荐)）
 13. [换机迁移](#13-换机迁移)
 14. [备份与恢复](#14-备份与恢复)
 15. [常见问题](#15-常见问题)
@@ -552,6 +552,117 @@ New-NetFirewallRule -DisplayName "Pause Annotation 8000" -Direction Inbound -Pro
 - `PUBLIC_BASE_URL=http://公网IP:8000`  
 
 稳定性通常不如云主机。
+
+### 12.5 GitHub + Render 免费公网部署（推荐）
+
+无需购买服务器，利用 [Render](https://render.com) 免费层即可让主试端和被试端都通过公网访问。
+
+#### 前提条件
+
+- 已有 GitHub 账号，并将本项目上传到一个仓库（建议**私有仓库**，避免泄露密钥）
+- `.gitignore` 中已包含 `.env` 和 `data/` 目录（项目默认已配置）
+
+#### 第一步：注册并登录 Render
+
+访问 [https://render.com](https://render.com)，用 GitHub 账号登录（授权后可直接读取仓库）。
+
+#### 第二步：创建 Web Service
+
+1. 点击右上角 **「New +」** → **「Web Service」**
+2. 选择 **「Connect a repository」**，找到你的项目仓库，点击 **「Connect」**
+
+#### 第三步：填写部署配置
+
+| 字段 | 填写内容 |
+|------|---------|
+| **Root Directory** | 留空 |
+| **Runtime** | `Python 3` |
+| **Build Command** | `pip install -r requirements.txt` |
+| **Start Command** | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| **Instance Type** | `Free`（$0/月） |
+
+> ⚠️ Start Command 必须使用上面的命令，不要使用 Render 默认提示的 `gunicorn` 命令。
+
+#### 第四步：配置环境变量
+
+在 **Environment Variables** 部分，点击 **「+ Add Environment Variable」** 依次添加：
+
+| Key | Value | 说明 |
+|-----|-------|------|
+| `HOST` | `0.0.0.0` | 监听所有网卡 |
+| `DATABASE_PATH` | `./data/app.db` | 数据库路径 |
+| `PIPELINE_TOKEN` | 点击右侧 **「Generate」** | 流水线鉴权密钥 |
+| `SECRET_KEY` | 点击右侧 **「Generate」** | Session 密钥 |
+| `PUBLIC_BASE_URL` | `https://temp.onrender.com` | 先填占位，部署后再改 |
+
+#### 第五步：配置高级选项
+
+在页面下方 **Advanced** 区域，只需修改一项：
+
+- **Health Check Path**：填入 `/api/health`（其余保持默认）
+
+#### 第六步：部署
+
+点击底部 **「Create Web Service」**，Render 会自动克隆仓库、安装依赖并启动服务，等待 3–5 分钟，状态变为 **Live** 即表示成功。
+
+部署完成后，你会得到一个公网地址，格式如：
+
+```
+https://your-app-name.onrender.com
+```
+
+#### 第七步：更新 PUBLIC_BASE_URL
+
+这一步**非常重要**，否则生成的被试链接域名会错误。
+
+1. 进入 Render Dashboard → 你的服务 → **「Environment」**
+2. 找到 `PUBLIC_BASE_URL`，改为你的实际地址，例如：
+   ```
+   https://your-app-name.onrender.com
+   ```
+3. 点击 **「Save Changes」**，服务会自动重启
+
+#### 第八步：验证
+
+| 验证项 | 地址 |
+|--------|------|
+| 健康检查 | `https://your-app-name.onrender.com/api/health` → 应返回 `{"status":"ok"}` |
+| 主试端 | `https://your-app-name.onrender.com/admin-login.html` |
+
+首次登录账号：用户名 `admin`，密码 `admin`，**登录后请立即修改密码**。
+
+#### 第九步：创建演示会话
+
+首次部署后数据库为空，需用本地脚本创建会话。先在 Render Dashboard → Environment 中查看并复制 `PIPELINE_TOKEN` 的值，然后在本地 PowerShell 或 Git Bash 中运行：
+
+```bash
+# 进入项目目录
+cd 停顿标注工具
+
+# 激活虚拟环境（Windows）
+.\.venv\Scripts\Activate.ps1
+
+# 创建固定的演示会话
+python scripts/create_demo_session.py \
+  --base-url https://your-app-name.onrender.com \
+  --token "你的PIPELINE_TOKEN"
+```
+
+成功后会打印被试链接，在主试端「详情」页也可复制。
+
+#### 后续代码更新
+
+每次将代码 `git push` 到 GitHub，Render 会自动检测并重新部署，无需手动操作。
+
+#### 免费层限制
+
+| 限制 | 说明 |
+|------|------|
+| **自动休眠** | 15 分钟无请求后休眠，下次访问需等待约 50 秒冷启动 |
+| **无持久化磁盘** | 服务重启后数据库会丢失；正式收数请升级到 Starter（$7/月）并挂载 Disk |
+| **带宽** | 100 GB/月，日常实验足够使用 |
+
+> 💡 **建议**：测试和演示阶段使用免费层；开始正式收集被试数据前，在 Render 升级 Starter 计划并添加 Disk（Mount Path: `/data`，Size: 1 GB），否则服务重启会导致数据丢失。
 
 ---
 
