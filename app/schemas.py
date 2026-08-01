@@ -54,6 +54,7 @@ class UtteranceOut(BaseModel):
     seq: int
     speaker: str
     text: str
+    raw_text: Optional[str] = None  # 含 <PAUSE:x.xs> 标记的原始文本
     easyturn_label: Optional[str] = None
     start_ms: Optional[int] = None
     end_ms: Optional[int] = None

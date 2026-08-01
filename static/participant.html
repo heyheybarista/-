@@ -16,6 +16,20 @@
   .speaker-label { font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
   .speaker-label.experimenter { color: #4b5563; }
   .speaker-label.participant { color: #2563eb; }
+  /* 停顿标注样式 */
+  .pause-marker {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    margin: 0 3px;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .pause-short  { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+  .pause-medium { background: #fed7aa; color: #7c2d12; border: 1px solid #fdba74; }
+  .pause-long   { background: #fecaca; color: #7f1d1d; border: 1px solid #fca5a5; }
 </style>
 </head>
 <body>
@@ -177,7 +191,7 @@ function render(data) {
       const speakerName = u.speaker === 'experimenter' ? '主试' : '被试';
       html += `<div class="utterance utterance-${speakerClass}">
         <div class="speaker-label ${speakerClass}">${speakerName} · #${u.seq}</div>
-        <p>${escapeHtml(u.text)}</p>`;
+        ${renderUtteranceText(u)}`;
 
       // Badge
       if (u.easyturn_label) {
@@ -273,6 +287,29 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str || '';
   return div.innerHTML;
+}
+
+/**
+ * 将 utterance 文本渲染为带停顿标注的 HTML。
+ * 优先使用 raw_text（含 <PAUSE:x.xs> 标记），否则回退到 text。
+ * 停顿时长分级：< 0.35s → short（黄），< 0.80s → medium（橙），≥ 0.80s → long（红）
+ */
+function renderUtteranceText(u) {
+  const source = u.raw_text || u.text || '';
+  if (!source.includes('<PAUSE:')) {
+    return `<p>${escapeHtml(source)}</p>`;
+  }
+  const parts = source.split(/(<PAUSE:\d+(?:\.\d+)?s>)/);
+  const inner = parts.map(part => {
+    const m = part.match(/^<PAUSE:(\d+(?:\.\d+)?)s>$/);
+    if (m) {
+      const sec = parseFloat(m[1]);
+      const level = sec >= 0.80 ? 'long' : sec >= 0.35 ? 'medium' : 'short';
+      return `<span class="pause-marker pause-${level}" title="停顿 ${m[1]}s">⏸ ${m[1]}s</span>`;
+    }
+    return escapeHtml(part);
+  }).join('');
+  return `<p>${inner}</p>`;
 }
 
 // ── Init ─────────────────────────────────────────

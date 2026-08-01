@@ -65,6 +65,7 @@ async def get_participant_session(token: str, db: AsyncSession = Depends(get_db)
             seq=u.seq,
             speaker=u.speaker,
             text=u.text,
+            raw_text=u.raw_text,
             easyturn_label=u.easyturn_label,
             start_ms=u.start_ms,
             end_ms=u.end_ms,
