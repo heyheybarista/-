@@ -62,19 +62,25 @@ async def create_session(req: CreateSessionRequest, db: AsyncSession = Depends(g
             if u.extra and isinstance(u.extra, dict):
                 pauses = u.extra.get("pauses", [])
             for idx, pause_info in enumerate(pauses):
-                duration_ms = int(pause_info.get("duration", 0) * 1000)
-                level = pause_info.get("level", "unknown")
-                target = AnnotationTarget(
-                    id=_new_id(),
-                    session_id=session.id,
-                    utterance_id=utterance.id,
-                    label="pause",
-                    required=True,
-                    display_hint=f"停顿 {pause_info.get('duration', 0):.2f}s ({level})",
-                    pause_duration_ms=duration_ms,
-                )
-                db.add(target)
-                target_count += 1
+                if not isinstance(pause_info, dict):
+                    continue
+                try:
+                    duration = float(pause_info.get("duration", 0))
+                    duration_ms = int(duration * 1000)
+                    level = str(pause_info.get("level", "unknown"))
+                    target = AnnotationTarget(
+                        id=_new_id(),
+                        session_id=session.id,
+                        utterance_id=utterance.id,
+                        label="pause",
+                        required=True,
+                        display_hint=f"停顿 {duration:.2f}s ({level})",
+                        pause_duration_ms=duration_ms,
+                    )
+                    db.add(target)
+                    target_count += 1
+                except (ValueError, TypeError, KeyError) as e:
+                    continue  # 跳过格式错误的 pause
 
     await db.commit()
 
