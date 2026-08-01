@@ -56,19 +56,23 @@ async def create_session(req: CreateSessionRequest, db: AsyncSession = Depends(g
         )
         db.add(utterance)
 
-        # 是否为被试侧 + 标签在可标注集合中
-        if u.speaker == "participant" and label and label in annotatable:
-            target = AnnotationTarget(
-                id=_new_id(),
-                session_id=session.id,
-                utterance_id=utterance.id,
-                label=label,
-                required=True,
-                display_hint=LABEL_HINTS.get(label, label),
-                pause_duration_ms=u.pause_duration_ms,
-            )
-            db.add(target)
-            target_count += 1
+        # 为每个 <PAUSE> 创建标注目标（仅被试侧）
+        if u.speaker == "participant":
+            pauses = u.extra.get("pauses", []) if isinstance(u.extra, dict) else []
+            for idx, pause_info in enumerate(pauses):
+                duration_ms = int(pause_info.get("duration", 0) * 1000)
+                level = pause_info.get("level", "unknown")
+                target = AnnotationTarget(
+                    id=_new_id(),
+                    session_id=session.id,
+                    utterance_id=utterance.id,
+                    label="pause",
+                    required=True,
+                    display_hint=f"停顿 {pause_info.get('duration', 0):.2f}s ({level})",
+                    pause_duration_ms=duration_ms,
+                )
+                db.add(target)
+                target_count += 1
 
     await db.commit()
 
