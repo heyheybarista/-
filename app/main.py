@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +12,16 @@ from app.routers import pipeline, participant, admin
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 settings = get_settings()
+
+# 临时方案：启动时删除旧数据库以应用新 schema（移除 utterance_id 唯一约束）
+# 生产环境应使用 Alembic 等迁移工具
+_reset_flag = os.getenv("RESET_DB_ONCE")
+if _reset_flag == "true":
+    db_path = Path(settings.database_path)
+    if db_path.exists():
+        print(f"[临时] 删除旧数据库: {db_path}")
+        db_path.unlink()
+        print("[临时] 数据库已删除，将重建")
 
 
 @asynccontextmanager
