@@ -60,7 +60,7 @@ class UtteranceOut(BaseModel):
     end_ms: Optional[int] = None
     duration_ms: Optional[int] = None
     pause_duration_ms: Optional[int] = None
-    annotation_target: Optional[AnnotationTargetOut] = None
+    annotation_targets: List[AnnotationTargetOut] = []  # 改为列表
 
     model_config = dict(from_attributes=True)
 

@@ -114,7 +114,7 @@ async def get_session_detail(
         select(Session)
         .where(Session.id == session_id)
         .options(
-            selectinload(Session.utterances).selectinload(Utterance.annotation_target).selectinload(AnnotationTarget.annotation)
+            selectinload(Session.utterances).selectinload(Utterance.annotation_targets).selectinload(AnnotationTarget.annotation)
         )
     )
     s = (await db.execute(stmt)).scalar_one_or_none()
@@ -218,7 +218,7 @@ async def export_session(
 ):
     s = (await db.execute(
         select(Session).where(Session.id == session_id).options(
-            selectinload(Session.utterances).selectinload(Utterance.annotation_target).selectinload(AnnotationTarget.annotation)
+            selectinload(Session.utterances).selectinload(Utterance.annotation_targets).selectinload(AnnotationTarget.annotation)
         )
     )).scalar_one_or_none()
     if not s:

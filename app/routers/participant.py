@@ -41,7 +41,7 @@ async def get_participant_session(token: str, db: AsyncSession = Depends(get_db)
         .where(Session.access_token == token)
         .options(
             selectinload(Session.utterances)
-            .selectinload(Utterance.annotation_target)
+            .selectinload(Utterance.annotation_targets)
             .selectinload(AnnotationTarget.annotation)
         )
     )
@@ -59,7 +59,13 @@ async def get_participant_session(token: str, db: AsyncSession = Depends(get_db)
 
     utterances_out = []
     for u in session.utterances:
-        tgt = u.annotation_target
+        targets_out = []
+        for tgt in u.annotation_targets:
+            targets_out.append(_build_target_out(tgt))
+
+        # pause_duration_ms 取第一个 target 的值（兼容旧逻辑）
+        first_pause_ms = targets_out[0]["pause_duration_ms"] if targets_out else None
+
         utterances_out.append(UtteranceOut(
             id=u.id,
             seq=u.seq,
@@ -70,8 +76,8 @@ async def get_participant_session(token: str, db: AsyncSession = Depends(get_db)
             start_ms=u.start_ms,
             end_ms=u.end_ms,
             duration_ms=u.duration_ms,
-            pause_duration_ms=tgt.pause_duration_ms if tgt else None,
-            annotation_target=_build_target_out(tgt) if tgt else None,
+            pause_duration_ms=first_pause_ms,
+            annotation_targets=targets_out,
         ))
 
     return ParticipantSessionOut(

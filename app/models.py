@@ -58,7 +58,7 @@ class Utterance(Base):
     extra = Column(JSON, nullable=True)
 
     session = relationship("Session", back_populates="utterances")
-    annotation_target = relationship("AnnotationTarget", back_populates="utterance", uselist=False,
+    annotation_targets = relationship("AnnotationTarget", back_populates="utterance",
                                      cascade="all, delete-orphan")
 
 
@@ -66,7 +66,7 @@ class AnnotationTarget(Base):
     __tablename__ = "annotation_targets"
     id = Column(String(24), primary_key=True, default=_new_id)
     session_id = Column(String(24), ForeignKey("sessions.id"), nullable=False)
-    utterance_id = Column(String(24), ForeignKey("utterances.id"), nullable=False, unique=True)
+    utterance_id = Column(String(24), ForeignKey("utterances.id"), nullable=False)
     label = Column(String(20), nullable=False)
     required = Column(Boolean, default=True)
     display_hint = Column(String(64), nullable=True)
