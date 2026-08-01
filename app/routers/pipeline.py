@@ -58,7 +58,9 @@ async def create_session(req: CreateSessionRequest, db: AsyncSession = Depends(g
 
         # 为每个 <PAUSE> 创建标注目标（仅被试侧）
         if u.speaker == "participant":
-            pauses = u.extra.get("pauses", []) if isinstance(u.extra, dict) else []
+            pauses = []
+            if u.extra and isinstance(u.extra, dict):
+                pauses = u.extra.get("pauses", [])
             for idx, pause_info in enumerate(pauses):
                 duration_ms = int(pause_info.get("duration", 0) * 1000)
                 level = pause_info.get("level", "unknown")
