@@ -10,6 +10,9 @@ Easy-Turn 到停顿标注工具的适配脚本
 5. 任务结束时 POST 到停顿标注工具 API
 
 用法：
+    python easyturn_adapter.py
+
+也可通过参数跳过启动时的交互输入：
     python easyturn_adapter.py --participant P001 --title "预实验-口语任务"
 """
 
@@ -520,19 +523,31 @@ class EasyTurnAdapter:
             print("连接已关闭")
 
 
+def prompt_required(label: str) -> str:
+    """Prompt until a non-empty session metadata value is entered."""
+    while True:
+        try:
+            value = input(f"请输入{label}: ").strip()
+        except EOFError as exc:
+            raise SystemExit(f"未输入{label}，无法开始录音") from exc
+        if value:
+            return value
+        print(f"⚠ {label}不能为空，请重新输入")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Easy-Turn 到停顿标注工具的适配脚本"
     )
     parser.add_argument(
         "--participant",
-        default="P001",
-        help="被试编号 (默认: P001)"
+        default=None,
+        help="被试编号；不提供时在录音前输入"
     )
     parser.add_argument(
         "--title",
-        default="预实验-口语任务",
-        help="会话标题 (默认: 预实验-口语任务)"
+        default=None,
+        help="对话标题；不提供时在录音前输入"
     )
     parser.add_argument(
         "--easyturn-url",
@@ -557,6 +572,12 @@ def main():
 
     args = parser.parse_args()
 
+    participant_id = args.participant or prompt_required("被试编号")
+    session_title = args.title or prompt_required("对话标题")
+    print("\n本轮录音信息")
+    print(f"  被试编号: {participant_id}")
+    print(f"  对话标题: {session_title}")
+
     # 尝试从环境变量或 .env 读取 token
     if args.token == "change-me":
         try:
@@ -577,8 +598,8 @@ def main():
     )
 
     adapter.run_daemon(
-        participant_id=args.participant,
-        title=args.title
+        participant_id=participant_id,
+        title=session_title
     )
 
 

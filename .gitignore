@@ -38,6 +38,7 @@ data/easyturn_backups/
 
 # Local reference snapshots and planning notes
 .local-reference/
+easyturn部署云主机/
 .venv.broken-*/
 .python-deps/
 task_plan.md
