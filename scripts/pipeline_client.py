@@ -35,7 +35,7 @@ def main():
         f"{args.base_url.rstrip('/')}/api/pipeline/sessions",
         json=payload,
         headers={"Authorization": f"Bearer {args.token}"},
-        timeout=30,
+        timeout=(10, 120),
     )
     resp.raise_for_status()
     result = resp.json()

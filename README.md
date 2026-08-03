@@ -40,7 +40,7 @@
 | **主试** | 登录后台、看会话列表与进度、复制链接发给被试、导出 CSV/JSON、重置/删除会话、改指导语与类别（管理员）、管理账号（管理员） |
 | **被试** | 用私密链接打开填写页，无需登录；自动暂存；全部填完后提交 |
 
-**第一版不做：** 音频回放、句内多段精细 pause 时间轴、自动发邮件/微信。
+**当前范围：** 每句话可以包含多个 pause 标注点；每个 pause 都对应一套独立标注表单。暂不包含音频回放、自动发邮件/微信。
 
 ---
 
@@ -446,9 +446,12 @@ http://192.168.1.150:8000/a/A3PSYO0TF9VrEnQlIiImV1J_rQ-En0zuzS9X7T84Q0k
     {
       "seq": 2,
       "speaker": "participant",
-      "text": "因为小时候",
-      "easyturn_label": "incomplete",
-      "pause_duration_ms": 800
+      "text": "因为小时候我去过那里。",
+      "raw_text": "因为小时候<PAUSE:0.42s>我去过那里<PAUSE:1.15s>。",
+      "pauses": [
+        {"duration": 0.42, "level": "medium"},
+        {"duration": 1.15, "level": "long"}
+      ]
     },
     {
       "seq": 3,
@@ -468,9 +471,11 @@ http://192.168.1.150:8000/a/A3PSYO0TF9VrEnQlIiImV1J_rQ-En0zuzS9X7T84Q0k
 | `seq` | 是 | 对话顺序 |
 | `speaker` | 是 | `participant`（被试）或 `experimenter`（主试） |
 | `text` | 是 | 转写文本（可不含标签） |
-| `easyturn_label` | 建议有 | `complete` / `incomplete` / `wait` / `backchannel` |
-| `raw_text` | 可选 | 可含 `<incomplete>` 等，服务端可兜底解析 |
-| `pause_duration_ms` 等 | 可选 | 预留时长字段 |
+| `easyturn_label` | 建议有 | 传统话轮标签；没有 `pauses` 时可用于兼容旧版按标签创建目标 |
+| `raw_text` | 可选 | 可含 `<PAUSE:x.xs>`，用于页面显示原始停顿位置 |
+| `pauses` | 推荐 | 当前规范；一个 utterance 可含多个 `{duration, level, ...}` pause |
+| `extra.pauses` | 兼容 | 旧备份格式；服务端会按与顶层 `pauses` 相同的规则读取 |
+| `pause_duration_ms` | 可选 | 旧版最长停顿字段，仍保留用于兼容 |
 
 同机调用：
 
@@ -489,10 +494,13 @@ python scripts/pipeline_client.py \
 Session created: ...
 Participant URL: http://.../a/...
 Admin URL:      http://.../admin-sessions.html
-Target count:   2
+Target count:   3
 ```
 
 把 **Participant URL** 发给被试，或让主试在后台复制。
+
+> 提交历史 adapter 备份时，可直接把 `data/easyturn_backups/*.json` 作为
+> `--utterances` 输入；服务端同时兼容顶层 `pauses` 和旧版 `extra.pauses`。
 
 ### 11.2 直接 HTTP
 
@@ -682,6 +690,8 @@ python scripts/create_demo_session.py \
 
 ## 14. 备份与恢复
 
+`easyturn_adapter.py` 产生的 JSON 备份统一写入 `data/easyturn_backups/`，不会再散落在仓库根目录。提交失败时，内存中的 utterances 不会清空，可修复服务后再次输入 `submit` 重试。
+
 备份数据库：
 
 ```bash
@@ -763,6 +773,7 @@ HTTP 局域网下浏览器可能禁用剪贴板 API。详情页已显示链接�
 │   ├── main.py             # 入口；/a/{token} 返回被试页
 │   ├── config.py           # 读取 .env
 │   ├── database.py         # SQLite
+│   ├── sqlite_migrations.py # 旧数据库无损迁移
 │   ├── models.py           # 数据表
 │   ├── schemas.py          # 接口模型
 │   ├── auth.py             # 主试登录 / 流水线鉴权
@@ -785,11 +796,14 @@ HTTP 局域网下浏览器可能禁用剪贴板 API。详情页已显示链接�
 │   ├── stop.bat            # 停止：结束占用 8000 端口的进程（Windows）
 │   └── pipeline_client.py  # 流水线客户端
 ├── data/                   # 数据库目录（app.db 自动生成）
+│   └── easyturn_backups/   # adapter JSON 备份（不提交到 GitHub）
 ├── .env.example            # 配置模板
 ├── .env                    # 实际配置（勿提交密钥到公开仓库）
 ├── requirements.txt
 └── README.md               # 本文件
 ```
+
+Easy-Turn 云主机源码快照不属于本项目运行时依赖，也不应提交到 GitHub。它已移到被 `.gitignore` 忽略的 `.local-reference/easyturn-cloud-snapshot/`，仓库只保留脱敏后的集成说明：[`docs/easyturn/README.md`](docs/easyturn/README.md)。
 
 ---
 

@@ -19,7 +19,9 @@ import time
 import argparse
 import sys
 from typing import List, Dict, Optional
-from collections import defaultdict
+from collections import OrderedDict
+from datetime import datetime
+from pathlib import Path
 
 try:
     import socketio
@@ -51,7 +53,8 @@ class EasyTurnAdapter:
         self.sequence_counter = 0
         self.participant_id: Optional[str] = None
         self.session_title: Optional[str] = None
-        self._seen_result_ids = set()  # 去重：广播与本连接可能都送达
+        self._result_groups = OrderedDict()
+        self.backup_dir = Path(__file__).resolve().parent / "data" / "easyturn_backups"
 
         self._register_handlers()
 
@@ -70,7 +73,7 @@ class EasyTurnAdapter:
                 print(f"✓ 已注册 client_id: {self.client_id}")
             print("=" * 60)
             print("开始录音，说话内容会自动记录。")
-            print("录音结束后输入 'done' 创建标注会话，或 'cancel' 取消。")
+            print("录音结束后输入 'submit' 创建标注会话，或 'quit' 退出。")
             print("=" * 60)
 
         @self.sio.on('disconnect')
@@ -78,21 +81,41 @@ class EasyTurnAdapter:
             print("\n✗ 与 Easy-Turn 断开连接")
 
         def _handle_final(data):
-            """处理最终转录结果（去重后累积）"""
+            """处理最终转录结果，保留同一结果的最高 revision。"""
+            data = data or {}
             result_id = (data or {}).get('result_id')
-            if result_id and result_id in self._seen_result_ids:
-                return
+            revision = self._revision_number(data.get('revision', 1))
             if result_id:
-                self._seen_result_ids.add(result_id)
+                previous = self._result_groups.get(result_id)
+                if previous and revision <= previous['revision']:
+                    return
             try:
                 annotated = data.get('annotated_text') or data.get('text', '')
                 if '<TURN_TRANSITION>' in (annotated or ''):
-                    utterances = self._split_by_turn_transitions(annotated, data.get('label'))
+                    utterances = self._split_by_turn_transitions(
+                        annotated,
+                        data.get('label'),
+                        result_id=result_id,
+                        revision=revision,
+                    )
                 else:
                     u = self._parse_transcription(data)
                     utterances = [u] if u else []
+                if not utterances:
+                    return
+                if result_id:
+                    self._result_groups[result_id] = {
+                        'revision': revision,
+                        'utterances': utterances,
+                    }
+                else:
+                    key = f'legacy-{time.time_ns()}'
+                    self._result_groups[key] = {
+                        'revision': revision,
+                        'utterances': utterances,
+                    }
+                self._rebuild_utterances()
                 for u in utterances:
-                    self.utterances.append(u)
                     self._display_utterance(u)
             except Exception as e:
                 print(f"⚠ 解析转录结果失败: {e}")
@@ -149,10 +172,8 @@ class EasyTurnAdapter:
         if pauses:
             max_pause_ms = int(max(p.get('duration', 0) for p in pauses) * 1000)
 
-        self.sequence_counter += 1
-
         return {
-            "seq": self.sequence_counter,
+            "seq": 0,
             "speaker": "participant",
             "text": transcript.strip(),
             "raw_text": annotated_text,
@@ -161,11 +182,18 @@ class EasyTurnAdapter:
             "pause_duration_ms": max_pause_ms,
             "extra": {
                 "result_id": data.get('result_id'),
-                "timestamp": time.time()
+                "revision": data.get('revision', 1),
+                "timestamp": time.time(),
+                "pauses": pauses,
             }
         }
 
-    def _split_by_turn_transitions(self, annotated_text: str, label: Optional[str]) -> List[Dict]:
+    def _split_by_turn_transitions(
+            self,
+            annotated_text: str,
+            label: Optional[str],
+            result_id: Optional[str] = None,
+            revision: int = 1) -> List[Dict]:
         """
         按 <TURN_TRANSITION> 拆分 annotated_text，每段生成一个 utterance。
 
@@ -201,9 +229,8 @@ class EasyTurnAdapter:
             seg_label = label if is_last else 'complete'
             max_pause_ms = int(max(p['duration'] for p in pauses) * 1000) if pauses else 0
 
-            self.sequence_counter += 1
             results.append({
-                "seq": self.sequence_counter,
+                "seq": 0,
                 "speaker": "participant",
                 "text": clean_text,
                 "raw_text": seg_text,
@@ -211,6 +238,8 @@ class EasyTurnAdapter:
                 "pauses": pauses,
                 "pause_duration_ms": max_pause_ms,
                 "extra": {
+                    "result_id": result_id,
+                    "revision": revision,
                     "timestamp": time.time(),
                     "segment_index": i,
                     "total_segments": len(segments),
@@ -219,6 +248,23 @@ class EasyTurnAdapter:
             })
 
         return results
+
+    @staticmethod
+    def _revision_number(value) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 1
+
+    def _rebuild_utterances(self):
+        """Flatten the latest result groups and renumber utterances."""
+        flattened = []
+        for group in self._result_groups.values():
+            flattened.extend(group['utterances'])
+        for seq, utterance in enumerate(flattened, start=1):
+            utterance['seq'] = seq
+        self.sequence_counter = len(flattened)
+        self.utterances = flattened
 
     def _clean_annotations(self, text: str) -> str:
         """清理文本中的标注标记"""
@@ -265,7 +311,7 @@ class EasyTurnAdapter:
         """显示转录结果"""
         seq = utterance['seq']
         text = utterance['text']
-        label = utterance.get('easyturn_label', 'unknown')
+        label = utterance.get('easyturn_label') or 'unknown'
         pauses = utterance.get('pauses', [])
 
         # 标签颜色映射
@@ -335,7 +381,7 @@ class EasyTurnAdapter:
             print(f"  标题: {self.session_title}")
             print(f"  语句数: {len(self.utterances)}")
 
-            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            response = requests.post(url, json=payload, headers=headers, timeout=(10, 120))
             response.raise_for_status()
 
             result = response.json()
@@ -368,15 +414,20 @@ class EasyTurnAdapter:
 
     def save_to_json(self, filepath: str):
         """保存 utterances 到 JSON 文件"""
+        path = Path(filepath)
+        if not path.is_absolute():
+            path = self.backup_dir / path
+        path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "participant_id": self.participant_id,
             "title": self.session_title,
             "timestamp": time.time(),
             "utterances": self.utterances
         }
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with path.open('w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        print(f"✓ 数据已保存到: {filepath}")
+        print(f"✓ 数据已保存到: {path}")
+        return path
 
     def run_daemon(self, participant_id: str, title: str):
         """常驻模式：持续运行，自动同步转录结果"""
@@ -413,17 +464,21 @@ class EasyTurnAdapter:
                             continue
 
                         # 保存备份
-                        timestamp = time.strftime("%Y%m%d_%H%M%S")
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                         backup_file = f"easyturn_backup_{timestamp}.json"
                         self.save_to_json(backup_file)
 
                         # 创建会话
-                        self.create_annotation_session()
+                        result = self.create_annotation_session()
+                        if result is None:
+                            print("\n提交未成功，当前内容仍保留，可修复服务后再次输入 submit 重试。")
+                            print("=" * 60 + "\n")
+                            continue
 
                         # 清空当前累积，准备下一轮
                         self.utterances.clear()
                         self.sequence_counter = 0
-                        self._seen_result_ids.clear()
+                        self._result_groups.clear()
                         print("\n已清空累积内容，可以开始下一轮录音")
                         print("=" * 60 + "\n")
 
@@ -431,7 +486,7 @@ class EasyTurnAdapter:
                         if not self.utterances:
                             print("⚠ 没有内容可保存")
                             continue
-                        timestamp = time.strftime("%Y%m%d_%H%M%S")
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                         filename = f"easyturn_{self.participant_id}_{timestamp}.json"
                         self.save_to_json(filename)
 
@@ -439,7 +494,7 @@ class EasyTurnAdapter:
                         count = len(self.utterances)
                         self.utterances.clear()
                         self.sequence_counter = 0
-                        self._seen_result_ids.clear()
+                        self._result_groups.clear()
                         print(f"✓ 已清空 {count} 条记录")
 
                     elif cmd == 'quit':
@@ -505,7 +560,8 @@ def main():
     # 尝试从环境变量或 .env 读取 token
     if args.token == "change-me":
         try:
-            with open(".env", "r", encoding="utf-8") as f:
+            env_path = Path(__file__).resolve().parent / ".env"
+            with env_path.open("r", encoding="utf-8") as f:
                 for line in f:
                     if line.startswith("PIPELINE_TOKEN="):
                         args.token = line.split("=", 1)[1].strip().strip('"')

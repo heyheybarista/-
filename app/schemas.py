@@ -5,6 +5,16 @@ from datetime import datetime
 
 # --- Pipeline Create Session ---
 
+class PauseIn(BaseModel):
+    duration: float = Field(ge=0)
+    level: Optional[str] = None
+    kind: Optional[str] = None
+    position: Optional[int] = None
+    position_in_clean_text: Optional[int] = None
+
+    model_config = dict(extra="allow")
+
+
 class UtteranceIn(BaseModel):
     seq: int
     speaker: str  # participant | experimenter
@@ -15,6 +25,7 @@ class UtteranceIn(BaseModel):
     end_ms: Optional[int] = None
     duration_ms: Optional[int] = None
     pause_duration_ms: Optional[int] = None
+    pauses: list[PauseIn] = Field(default_factory=list)
     extra: Optional[dict] = None
 
 
@@ -40,6 +51,7 @@ class CreateSessionResponse(BaseModel):
 class AnnotationTargetOut(BaseModel):
     id: str
     utterance_id: str
+    target_index: Optional[int] = None
     label: str
     required: bool
     display_hint: Optional[str] = None
@@ -60,7 +72,7 @@ class UtteranceOut(BaseModel):
     end_ms: Optional[int] = None
     duration_ms: Optional[int] = None
     pause_duration_ms: Optional[int] = None
-    annotation_targets: List[AnnotationTargetOut] = []  # 改为列表
+    annotation_targets: list[AnnotationTargetOut] = Field(default_factory=list)
 
     model_config = dict(from_attributes=True)
 

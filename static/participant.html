@@ -114,6 +114,9 @@ function autoSave(targetId, field, value) {
     }, delay);
   });
   pendingSaves[key] = p;
+  // Autosave is intentionally fire-and-forget. Keep the original rejecting
+  // promise in pendingSaves so an explicit submit can still report failures.
+  p.catch(() => {});
 }
 
 async function flushPendingSaves() {
@@ -201,9 +204,8 @@ function render(data) {
         html += ` <span style="font-size:12px;color:#6b7280;">约 ${(u.pause_duration_ms/1000).toFixed(1)}s</span>`;
       }
 
-      // Annotation form if target exists
-      if (u.annotation_target) {
-        const t = u.annotation_target;
+      // One annotation form for every pause target in this utterance.
+      for (const t of (u.annotation_targets || [])) {
         const ann = t.annotation || {};
         html += renderAnnotationForm(t, ann, isReadonly);
       }

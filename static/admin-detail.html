@@ -71,26 +71,38 @@ function render() {
 
   const body = document.getElementById('dialogue-body');
   body.innerHTML = detail.utterances.map(u => {
-    let t = u.target;
-    let annHtml = '';
-    if (t && t.annotation) {
-      annHtml = `<div style="margin-top:6px;padding:8px;background:#fefce8;border-radius:6px;font-size:13px;">
-        <strong>${esc(t.display_hint || t.label)}</strong>
-        · 类别：${esc(t.annotation.category || '-')}
-        · 描述：${esc(t.annotation.description || '-')}
-        · 置信度：${t.annotation.confidence != null ? t.annotation.confidence : '-'}
-        · ${t.annotation.is_complete ? '✅完整' : '⚠未完成'}
-      </div>`;
-    } else if (t) {
-      annHtml = `<div style="margin-top:4px;font-size:12px;color:#d97706;">未填写 · ${esc(t.display_hint||t.label)}${t.required?' (必填)':''}</div>`;
-    }
+    const annHtml = (u.targets || []).map(t => {
+      if (t.annotation) {
+        return `<div style="margin-top:6px;padding:8px;background:#fefce8;border-radius:6px;font-size:13px;">
+          <strong>${esc(t.display_hint || t.label)}</strong>
+          · 类别：${esc(t.annotation.category || '-')}
+          · 描述：${esc(t.annotation.description || '-')}
+          · 置信度：${t.annotation.confidence != null ? t.annotation.confidence : '-'}
+          · ${t.annotation.is_complete ? '✅完整' : '⚠未完成'}
+        </div>`;
+      }
+      return `<div style="margin-top:4px;font-size:12px;color:#d97706;">未填写 · ${esc(t.display_hint || t.label)}${t.required ? ' (必填)' : ''}</div>`;
+    }).join('');
     const label = u.easyturn_label ? `<span class="badge badge-${esc(u.easyturn_label)}">${esc(u.easyturn_label)}</span>` : '';
     const speaker = u.speaker === 'experimenter' ? '主试' : '被试';
     return `<div class="utterance utterance-${esc(u.speaker)}">
       <div class="speaker-label ${esc(u.speaker)}">${speaker} · #${u.seq}</div>
-      <p>${esc(u.text)}</p>${label}${annHtml}
+      ${renderUtteranceText(u)}${label}${annHtml}
     </div>`;
   }).join('');
+}
+
+function renderUtteranceText(u) {
+  const source = u.raw_text || u.text || '';
+  const parts = source.split(/(<PAUSE:\d+(?:\.\d+)?s>)/);
+  const inner = parts.map(part => {
+    const match = part.match(/^<PAUSE:(\d+(?:\.\d+)?)s>$/);
+    if (!match) return esc(part);
+    const seconds = parseFloat(match[1]);
+    const level = seconds >= 0.80 ? 'long' : seconds >= 0.35 ? 'medium' : 'short';
+    return `<span class="pause-marker pause-${level}" title="停顿 ${match[1]}s">⏸ ${match[1]}s</span>`;
+  }).join('');
+  return `<p>${inner}</p>`;
 }
 
 async function copyText(text) {

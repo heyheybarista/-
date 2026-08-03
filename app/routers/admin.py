@@ -123,26 +123,30 @@ async def get_session_detail(
 
     utterances = []
     for u in s.utterances:
-        t = u.annotation_target
-        ann = t.annotation if t else None
-        utterances.append({
-            "seq": u.seq,
-            "speaker": u.speaker,
-            "text": u.text,
-            "easyturn_label": u.easyturn_label,
-            "pause_duration_ms": t.pause_duration_ms if t else None,
-            "target": {
+        targets = []
+        for t in u.annotation_targets:
+            ann = t.annotation
+            targets.append({
                 "id": t.id,
+                "target_index": t.target_index,
                 "label": t.label,
                 "required": t.required,
                 "display_hint": t.display_hint,
+                "pause_duration_ms": t.pause_duration_ms,
                 "annotation": {
                     "category": ann.category,
                     "description": ann.description,
                     "confidence": ann.confidence,
                     "is_complete": ann.is_complete,
                 } if ann else None,
-            } if t else None,
+            })
+        utterances.append({
+            "seq": u.seq,
+            "speaker": u.speaker,
+            "text": u.text,
+            "raw_text": u.raw_text,
+            "easyturn_label": u.easyturn_label,
+            "targets": targets,
         })
 
     from app.config import get_settings
@@ -226,22 +230,26 @@ async def export_session(
 
     rows = []
     for u in s.utterances:
-        t = u.annotation_target
-        ann = t.annotation if t else None
-        rows.append({
-            "session_id": s.id,
-            "external_participant_id": s.external_participant_id,
-            "seq": u.seq,
-            "speaker": u.speaker,
-            "text": u.text,
-            "easyturn_label": u.easyturn_label,
-            "pause_duration_ms": t.pause_duration_ms if t else None,
-            "target_label": t.label if t else None,
-            "category": ann.category if ann else None,
-            "description": ann.description if ann else None,
-            "confidence": ann.confidence if ann else None,
-            "is_complete": ann.is_complete if ann else False,
-        })
+        targets = u.annotation_targets or [None]
+        for t in targets:
+            ann = t.annotation if t else None
+            rows.append({
+                "session_id": s.id,
+                "external_participant_id": s.external_participant_id,
+                "seq": u.seq,
+                "speaker": u.speaker,
+                "text": u.text,
+                "raw_text": u.raw_text,
+                "easyturn_label": u.easyturn_label,
+                "target_index": t.target_index if t else None,
+                "pause_duration_ms": t.pause_duration_ms if t else None,
+                "target_label": t.label if t else None,
+                "display_hint": t.display_hint if t else None,
+                "category": ann.category if ann else None,
+                "description": ann.description if ann else None,
+                "confidence": ann.confidence if ann else None,
+                "is_complete": ann.is_complete if ann else False,
+            })
 
     if format == "csv":
         output = io.StringIO()

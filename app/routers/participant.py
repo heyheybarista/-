@@ -17,6 +17,7 @@ def _build_target_out(target: AnnotationTarget) -> dict:
     return {
         "id": target.id,
         "utterance_id": target.utterance_id,
+        "target_index": target.target_index,
         "label": target.label,
         "required": target.required,
         "display_hint": target.display_hint or LABEL_HINTS.get(target.label, target.label),

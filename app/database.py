@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from app.config import get_settings
+from app.sqlite_migrations import migrate_annotation_targets
 
 settings = get_settings()
 # SQLite with aiosqlite, WAL mode
@@ -17,9 +18,11 @@ class Base(DeclarativeBase):
 
 async def init_db():
     import app.models  # noqa: ensure all models loaded
+    migrate_annotation_targets(settings.database_path)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    # enable WAL
+
+    # Enable WAL and foreign keys for the connection used during startup.
     async with engine.connect() as conn:
         await conn.exec_driver_sql("PRAGMA journal_mode=WAL")
         await conn.exec_driver_sql("PRAGMA foreign_keys=ON")
@@ -105,6 +108,7 @@ async def create_demo_session_if_missing():
                 target = AnnotationTarget(
                     session_id=demo_session.id,
                     utterance_id=utt.id,
+                    target_index=0,
                     label=label,
                     required=True,
                     pause_duration_ms=ut_data.get("pause_duration_ms")
@@ -116,4 +120,3 @@ async def create_demo_session_if_missing():
         participant_url = f"{settings.public_base_url}/a/{token}"
         print(f"✅ Demo session created: DEMO001")
         print(f"   Participant URL: {participant_url}")
-

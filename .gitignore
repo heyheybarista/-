@@ -33,6 +33,16 @@ Thumbs.db
 
 # Backup files
 *.bak
+easyturn_backup_*.json
+data/easyturn_backups/
+
+# Local reference snapshots and planning notes
+.local-reference/
+.venv.broken-*/
+.python-deps/
+task_plan.md
+findings.md
+progress.md
 
 # Test files
 scripts/*.json

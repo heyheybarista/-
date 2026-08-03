@@ -58,8 +58,12 @@ class Utterance(Base):
     extra = Column(JSON, nullable=True)
 
     session = relationship("Session", back_populates="utterances")
-    annotation_targets = relationship("AnnotationTarget", back_populates="utterance",
-                                     cascade="all, delete-orphan")
+    annotation_targets = relationship(
+        "AnnotationTarget",
+        back_populates="utterance",
+        order_by=lambda: (AnnotationTarget.target_index, AnnotationTarget.id),
+        cascade="all, delete-orphan",
+    )
 
 
 class AnnotationTarget(Base):
@@ -67,13 +71,14 @@ class AnnotationTarget(Base):
     id = Column(String(24), primary_key=True, default=_new_id)
     session_id = Column(String(24), ForeignKey("sessions.id"), nullable=False)
     utterance_id = Column(String(24), ForeignKey("utterances.id"), nullable=False)
+    target_index = Column(Integer, nullable=False, default=0)
     label = Column(String(20), nullable=False)
     required = Column(Boolean, default=True)
     display_hint = Column(String(64), nullable=True)
     pause_duration_ms = Column(Integer, nullable=True)
 
     session = relationship("Session", back_populates="annotation_targets")
-    utterance = relationship("Utterance", back_populates="annotation_target")
+    utterance = relationship("Utterance", back_populates="annotation_targets")
     annotation = relationship("Annotation", back_populates="target", uselist=False,
                               cascade="all, delete-orphan")
 
