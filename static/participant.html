@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>停顿回溯标注</title>
-<link rel="stylesheet" href="/css/style.css?v=2.3">
+<link rel="stylesheet" href="/css/style.css?v=2.4">
 <style>
   .instruction-card { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
   .instruction-card summary { font-weight: 700; cursor: pointer; font-size: 15px; }
@@ -13,7 +13,7 @@
   .save-status.saved { color: #059669; }
   .save-status.saving { color: #d97706; }
   .save-status.error { color: #dc2626; }
-  .speaker-label { font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+  .speaker-label { font-size: 12px; font-weight: 700; margin-bottom: 2px; }
   .speaker-label.experimenter { color: #4b5563; }
   .speaker-label.participant { color: #2563eb; }
   /* 停顿标注样式 */
@@ -289,7 +289,7 @@ function render(data) {
   // Instruction
   if (data.instruction) {
     html += `<details class="instruction-card" open>
-      <summary>📋 填写说明</summary>
+      <summary>填写说明</summary>
       <div class="instruction-body">${escapeHtml(data.instruction)}</div>
     </details>`;
   }
@@ -298,20 +298,23 @@ function render(data) {
   if (!data.utterances || data.utterances.length === 0) {
     html += '<div class="card"><p>暂无对话数据。</p></div>';
   } else {
-    html += '<div class="card">';
+    html += `<section class="dialogue-shell" aria-label="对话内容">
+      <div class="dialogue-heading"><h2>对话</h2></div>
+      <div class="dialogue-thread">`;
     for (const u of data.utterances) {
       const speakerClass = u.speaker === 'experimenter' ? 'experimenter' : 'participant';
       const speakerName = u.speaker === 'experimenter' ? '主试' : '被试';
-      html += `<div class="utterance utterance-${speakerClass}">
-        <div class="speaker-label ${speakerClass}">${speakerName} · #${u.seq}</div>
-        ${renderUtteranceText(u)}`;
+      html += `<article class="chat-row chat-row-${speakerClass}">
+        <div class="chat-bubble chat-bubble-${speakerClass}">
+          <div class="chat-meta"><span class="speaker-label ${speakerClass}">${speakerName}</span><span class="utterance-seq">#${u.seq}</span></div>
+          <div class="chat-text">${renderUtteranceText(u)}</div>`;
 
       // Badge
       if (u.easyturn_label) {
         html += `<span class="badge badge-${u.easyturn_label}">${u.easyturn_label}</span>`;
       }
       if (u.pause_duration_ms) {
-        html += ` <span style="font-size:12px;color:#6b7280;">约 ${(u.pause_duration_ms/1000).toFixed(1)}s</span>`;
+        html += ` <span class="duration-note">约 ${(u.pause_duration_ms/1000).toFixed(1)}s</span>`;
       }
 
       // One annotation form for every pause target in this utterance.
@@ -320,14 +323,14 @@ function render(data) {
         html += renderAnnotationForm(t, ann, isReadonly);
       }
 
-      html += '</div>';
+      html += '</div></article>';
     }
-    html += '</div>';
+    html += '</div></section>';
   }
 
   // Submitted notice
   if (isReadonly) {
-    html = '<div class="card" style="background:#d1fae5;border:1px solid #059669;text-align:center;margin-bottom:16px;">✅ 你已于 ' + (data.status === 'submitted' ? '提交完成' : '') + '。以下为只读查看。</div>' + html;
+    html = '<div class="submission-notice" role="status">你已提交完成。以下为只读查看。</div>' + html;
   }
 
   document.getElementById('app').innerHTML = html;
@@ -381,7 +384,7 @@ function renderAnnotationForm(target, ann, readonly) {
   ).join('');
 
   return `<div class="annotation-form" data-target-id="${target.id}">
-    <div style="font-size:12px;color:#92400e;margin-bottom:6px;">🏷 标记：<strong>${escapeHtml(target.display_hint || target.label)}</strong>${target.required ? '（必填）' : ''}</div>
+    <div class="target-label">标记：<strong>${escapeHtml(target.display_hint || target.label)}</strong>${target.required ? '（必填）' : ''}</div>
     <label>原因类别</label>
     <select ${readonly?'disabled':''}>${catOptions}</select>
     <label>原因与心理过程</label>
@@ -436,7 +439,7 @@ function renderUtteranceText(u) {
     if (m) {
       const sec = parseFloat(m[1]);
       const level = sec >= 0.80 ? 'long' : sec >= 0.35 ? 'medium' : 'short';
-      return `<span class="pause-marker pause-${level}" title="停顿 ${m[1]}s">⏸ ${m[1]}s</span>`;
+      return `<span class="pause-marker pause-${level}" title="停顿 ${m[1]}s">停顿 ${m[1]}s</span>`;
     }
     return escapeHtml(part);
   }).join('');

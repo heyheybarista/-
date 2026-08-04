@@ -1,6 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; line-height: 1.6; color: #1a1a1a; background: #f5f5f5; padding: 0; }
 .container { max-width: 800px; margin: 0 auto; padding: 16px; }
+#app.container { max-width: 900px; }
 .card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 .btn { display: inline-block; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
 .btn-primary { background: #2563eb; color: #fff; }
@@ -12,16 +13,31 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft Ya
 .badge-wait { background: #dbeafe; color: #1e40af; }
 .badge-complete { background: #d1fae5; color: #065f46; }
 .badge-backchannel { background: #f3f4f6; color: #374151; }
-.utterance { padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; }
-.utterance-experimenter { background: #f0f4ff; border-left: 3px solid #93a3c0; }
-.utterance-participant { background: #fff; border: 1px solid #e5e7eb; }
+.dialogue-shell { margin-bottom: 16px; }
+.dialogue-heading { display: flex; align-items: baseline; padding: 4px 4px 12px; }
+.dialogue-heading h2 { font-size: 20px; line-height: 1.3; }
+.dialogue-thread { display: flex; flex-direction: column; gap: 12px; }
+.chat-row { display: flex; width: 100%; }
+.chat-row-experimenter { justify-content: flex-start; }
+.chat-row-participant { justify-content: flex-end; }
+.chat-bubble { position: relative; width: fit-content; max-width: min(88%, 680px); padding: 14px 16px; border: 1px solid; border-radius: 16px; box-shadow: 0 2px 6px rgba(15,23,42,0.08); overflow-wrap: anywhere; }
+.chat-bubble-experimenter { background: #f8fafc; border-color: #cbd5e1; border-top-left-radius: 6px; }
+.chat-bubble-participant { background: #eff6ff; border-color: #bfdbfe; border-top-right-radius: 6px; }
+.chat-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.utterance-seq { color: #64748b; font-size: 12px; }
+.chat-text p { margin: 0 0 8px; white-space: pre-wrap; line-height: 1.7; }
+.chat-text p:last-child { margin-bottom: 0; }
+.chat-bubble-participant .badge { margin-bottom: 8px; }
+.duration-note { color: #64748b; font-size: 12px; }
+.submission-notice { background: #ecfdf5; border: 1px solid #059669; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; text-align: center; color: #065f46; }
+#submit-btn { min-height: 44px; touch-action: manipulation; }
 .pause-marker { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; margin: 0 3px; vertical-align: middle; white-space: nowrap; }
 .pause-short { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
 .pause-medium { background: #fed7aa; color: #7c2d12; border: 1px solid #fdba74; }
 .pause-long { background: #fecaca; color: #7f1d1d; border: 1px solid #fca5a5; }
-.annotation-form { margin-top: 10px; padding: 12px; background: #fefce8; border-radius: 8px; border: 1px solid #fde68a; }
+.annotation-form { margin-top: 12px; padding: 14px; background: #fffbeb; border-radius: 10px; border: 1px solid #fcd34d; }
 .annotation-form label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 13px; }
-.annotation-form select, .annotation-form textarea { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; margin-bottom: 10px; }
+.annotation-form select, .annotation-form textarea { width: 100%; min-height: 44px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; margin-bottom: 10px; background: #fff; }
 .description-input textarea { height: 144px; min-height: 144px; max-height: 144px; margin-bottom: 6px; resize: none; overflow-y: auto; }
 .speech-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 44px; margin-bottom: 10px; }
 .speech-input-btn { min-width: 76px; min-height: 44px; padding: 8px 12px; border: 1px solid #9ca3af; border-radius: 6px; background: #fff; color: #1f2937; cursor: pointer; font-size: 14px; }
@@ -31,8 +47,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft Ya
 .speech-status { flex: 1 1 180px; min-height: 20px; font-size: 12px; color: #6b7280; }
 .speech-status.error { color: #b91c1c; }
 .confidence-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-.confidence-btn { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #d1d5db; background: #fff; cursor: pointer; font-size: 14px; }
+.confidence-btn { width: 44px; height: 44px; min-width: 44px; border-radius: 50%; border: 2px solid #d1d5db; background: #fff; cursor: pointer; font-size: 14px; touch-action: manipulation; }
 .confidence-btn.selected { border-color: #2563eb; background: #dbeafe; font-weight: 700; }
+.confidence-row { flex-wrap: wrap; }
+.target-label { margin-bottom: 8px; color: #92400e; font-size: 12px; }
+.chat-bubble-experimenter .chat-text { color: #1f2937; }
+.chat-bubble-participant .chat-text { color: #172554; }
+.chat-bubble:focus-within { box-shadow: 0 0 0 3px rgba(37,99,235,0.16), 0 2px 6px rgba(15,23,42,0.08); }
+#app button:focus-visible, #app select:focus-visible, #app textarea:focus-visible { outline: 3px solid rgba(37,99,235,0.35); outline-offset: 2px; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
 th { font-size: 12px; text-transform: uppercase; color: #6b7280; }
@@ -40,8 +62,14 @@ progress { width: 100%; height: 8px; border-radius: 4px; }
 progress::-webkit-progress-bar { background: #e5e7eb; border-radius: 4px; }
 progress::-webkit-progress-value { background: #2563eb; border-radius: 4px; }
 @media (max-width: 600px) {
+  #topbar { flex-wrap: wrap; gap: 8px; }
+  #topbar > div:last-child { width: 100%; justify-content: flex-end; }
   .container { padding: 8px; }
   .card { padding: 12px; }
+  .dialogue-heading { align-items: flex-start; flex-direction: column; gap: 2px; padding-inline: 2px; }
+  .dialogue-heading h2 { font-size: 18px; }
+  .chat-bubble { max-width: 96%; padding: 12px; }
+  .annotation-form select, .annotation-form textarea { font-size: 16px; }
   .description-input textarea { height: 168px; min-height: 168px; max-height: 168px; font-size: 16px; }
   .speech-status { flex-basis: 100%; }
 }
