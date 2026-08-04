@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>停顿回溯标注</title>
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/style.css?v=2.3">
 <style>
   .instruction-card { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
   .instruction-card summary { font-weight: 700; cursor: pointer; font-size: 15px; }
@@ -386,7 +386,7 @@ function renderAnnotationForm(target, ann, readonly) {
     <select ${readonly?'disabled':''}>${catOptions}</select>
     <label>原因与心理过程</label>
     <div class="description-input">
-      <textarea rows="3" placeholder="请描述当时停顿的原因…" ${readonly?'disabled':''}>${escapeHtml(ann.description || '')}</textarea>
+      <textarea rows="3" style="resize:none;overflow-y:auto;" placeholder="请描述当时停顿的原因…" ${readonly?'disabled':''}>${escapeHtml(ann.description || '')}</textarea>
       ${!readonly && speechSupported ? `<div class="speech-controls">
         <button type="button" class="speech-input-btn" aria-label="使用语音输入原因与心理过程" aria-pressed="false">语音输入</button>
         <span class="speech-status" role="status" aria-live="polite"></span>
