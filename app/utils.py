@@ -42,14 +42,26 @@ DEFAULT_INSTRUCTION = """任务说明
 DEFAULT_ANNOTATABLE_LABELS = ["incomplete", "wait"]
 
 DEFAULT_REASON_CATEGORIES = [
-    {"value": "lexical", "label": "找词 / 词汇提取"},
-    {"value": "syntax", "label": "句法 / 句子组织"},
-    {"value": "thinking", "label": "内容思考"},
-    {"value": "intention_shift", "label": "意图切换"},
-    {"value": "interactive", "label": "互动 / 等待对方"},
-    {"value": "external", "label": "外部干扰"},
+    {"value": "memory_retrieval", "label": "记忆检索（从记忆中提取过去的经历、事实或其他相关信息）"},
+    {"value": "content_planning", "label": "内容规划（规划接下来要表达的内容、信息顺序及具体展开方式）"},
+    {"value": "lexical_retrieval", "label": "词汇检索（检索或选择表达当前意思所需的某个单词或词组）"},
+    {"value": "sentence_organization", "label": "句式组织（选择或重新组织表达当前意思的句式，包括比较不同表达方案、安排词序及确定分句关系）"},
+    {"value": "phonological_encoding", "label": "语音编码（准备或确认即将说出的词语的发音形式及语音实现方式）"},
+    {"value": "emphatic_pause", "label": "强调性停顿（通过停顿突出后续内容的重要性、对比关系或转折）"},
     {"value": "other", "label": "其他"},
 ]
+
+LEGACY_DEFAULT_REASON_CATEGORY_VALUES = (
+    "lexical", "syntax", "thinking", "intention_shift", "interactive", "external", "other"
+)
+
+
+def is_legacy_default_reason_categories(categories: object) -> bool:
+    """Identify the original built-in list so existing settings can be upgraded."""
+    if not isinstance(categories, list):
+        return False
+    values = [item.get("value") for item in categories if isinstance(item, dict)]
+    return values == list(LEGACY_DEFAULT_REASON_CATEGORY_VALUES)
 
 LABEL_HINTS = {
     "incomplete": "未说完",

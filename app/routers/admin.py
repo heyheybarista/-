@@ -16,7 +16,7 @@ from app.schemas import (
 from app.auth import get_current_user, require_admin, ADMIN_SESSION_KEY
 from app.utils import (
     generate_token, DEFAULT_INSTRUCTION, DEFAULT_ANNOTATABLE_LABELS,
-    DEFAULT_REASON_CATEGORIES,
+    DEFAULT_REASON_CATEGORIES, is_legacy_default_reason_categories,
 )
 
 router = APIRouter(tags=["admin"])
@@ -36,7 +36,10 @@ async def _get_settings(db: AsyncSession) -> dict:
         store["instruction_text"] = DEFAULT_INSTRUCTION
     if "annotatable_labels" not in store:
         store["annotatable_labels"] = DEFAULT_ANNOTATABLE_LABELS
-    if "reason_categories" not in store:
+    if (
+        "reason_categories" not in store
+        or is_legacy_default_reason_categories(store["reason_categories"])
+    ):
         store["reason_categories"] = DEFAULT_REASON_CATEGORIES
     return store
 

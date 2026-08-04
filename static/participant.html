@@ -368,7 +368,11 @@ function renderAnnotationForm(target, ann, readonly) {
   const categories = JSON.parse(document.getElementById('categories-data')?.textContent || '[]');
   // Placeholder so the first real category is NOT auto-selected without user action
   const placeholder = `<option value="" ${ann.category ? '' : 'selected'} disabled>请选择类别…</option>`;
-  const catOptions = placeholder + categories.map(c =>
+  const hasCurrentCategory = categories.some(c => c.value === ann.category);
+  const legacyCategory = ann.category && !hasCurrentCategory
+    ? `<option value="${escapeHtml(ann.category)}" selected>历史类别（${escapeHtml(ann.category)}）</option>`
+    : '';
+  const catOptions = placeholder + legacyCategory + categories.map(c =>
     `<option value="${escapeHtml(c.value)}" ${ann.category === c.value ? 'selected' : ''}>${escapeHtml(c.label)}</option>`
   ).join('');
 
