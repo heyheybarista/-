@@ -1,6 +1,10 @@
 import fs from "node:fs";
 
-const files = ["static/participant.html", "static/admin-detail.html"];
+const files = [
+  "static/participant.html",
+  "static/admin-detail.html",
+  "static/admin-sessions.html",
+];
 
 for (const file of files) {
   const html = fs.readFileSync(file, "utf8");

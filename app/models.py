@@ -28,7 +28,8 @@ class Session(Base):
     id = Column(String(24), primary_key=True, default=_new_id)
     external_participant_id = Column(String(64), nullable=True)
     title = Column(String(256), nullable=True)
-    status = Column(String(20), nullable=False, default="created")  # created | in_progress | submitted
+    # speaker_review | created | in_progress | submitted
+    status = Column(String(20), nullable=False, default="created")
     access_token = Column(String(64), unique=True, nullable=False, index=True)
     annotatable_labels = Column(JSON, nullable=False, default=list)
     pipeline_meta = Column(JSON, nullable=True)

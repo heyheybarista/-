@@ -389,11 +389,9 @@ class EasyTurnAdapter:
             result = response.json()
             print(f"\n✓ 标注会话创建成功!")
             print(f"  Session ID: {result['session_id']}")
-            print(f"  标注目标数: {result['target_count']}")
-            print(f"\n被试链接:")
-            print(f"  {result['participant_url']}")
-            print(f"\n主试后台:")
+            print(f"\n请先在主试端标注说话人:")
             print(f"  {result['admin_url']}")
+            print("  确认后，页面会生成可发送给被试的链接。")
 
             return result
 

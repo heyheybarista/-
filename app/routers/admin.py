@@ -11,12 +11,12 @@ from app.database import get_db
 from app.models import Session, Utterance, AnnotationTarget, Annotation, Experimenter, GlobalSetting
 from app.schemas import (
     AdminLoginRequest, SessionListItem, SettingsUpdate, SettingsOut,
-    UserCreate, UserOut, UserPasswordReset,
+    SpeakerReviewRequest, UserCreate, UserOut, UserPasswordReset,
 )
 from app.auth import get_current_user, require_admin, ADMIN_SESSION_KEY
 from app.utils import (
     generate_token, DEFAULT_INSTRUCTION, DEFAULT_ANNOTATABLE_LABELS,
-    DEFAULT_REASON_CATEGORIES, is_legacy_default_reason_categories,
+    DEFAULT_REASON_CATEGORIES, LABEL_HINTS, is_legacy_default_reason_categories,
 )
 
 router = APIRouter(tags=["admin"])
@@ -51,6 +51,49 @@ async def _init_admin(db: AsyncSession):
         pw = bcrypt.hashpw("admin".encode(), bcrypt.gensalt()).decode()
         db.add(Experimenter(id=_new_id(), username="admin", password_hash=pw, role="admin"))
         await db.commit()
+
+
+def _create_targets_for_utterance(session: Session, utterance: Utterance) -> list[AnnotationTarget]:
+    """Rebuild pause targets after the experimenter confirms speakers."""
+    extra = utterance.extra if isinstance(utterance.extra, dict) else {}
+    pauses = extra.get("pauses")
+    if isinstance(pauses, list) and pauses:
+        targets = []
+        for index, pause in enumerate(pauses):
+            if not isinstance(pause, dict):
+                continue
+            try:
+                duration = float(pause.get("duration", 0))
+            except (TypeError, ValueError):
+                continue
+            if duration < 0:
+                continue
+            level = str(pause.get("level", "unknown"))
+            targets.append(AnnotationTarget(
+                id=_new_id(),
+                session_id=session.id,
+                utterance_id=utterance.id,
+                target_index=index,
+                label="pause",
+                required=True,
+                display_hint=f"停顿 {duration:.2f}s ({level})",
+                pause_duration_ms=int(duration * 1000),
+            ))
+        return targets
+
+    label = utterance.easyturn_label
+    if label and label in (session.annotatable_labels or []):
+        return [AnnotationTarget(
+            id=_new_id(),
+            session_id=session.id,
+            utterance_id=utterance.id,
+            target_index=0,
+            label=label,
+            required=True,
+            display_hint=LABEL_HINTS.get(label, label),
+            pause_duration_ms=extra.get("pause_duration_ms"),
+        )]
+    return []
 
 
 # ── login / logout ─────────────────────────────────────────
@@ -144,6 +187,7 @@ async def get_session_detail(
                 } if ann else None,
             })
         utterances.append({
+            "id": u.id,
             "seq": u.seq,
             "speaker": u.speaker,
             "text": u.text,
@@ -155,19 +199,77 @@ async def get_session_detail(
     from app.config import get_settings
     base = get_settings().public_base_url.rstrip("/")
 
+    is_speaker_review = s.status == "speaker_review"
     return {
         "session": {
             "id": s.id,
             "external_participant_id": s.external_participant_id,
             "title": s.title,
             "status": s.status,
-            "access_token": s.access_token,
-            "participant_url": f"{base}/a/{s.access_token}",
+            "access_token": None if is_speaker_review else s.access_token,
+            "participant_url": None if is_speaker_review else f"{base}/a/{s.access_token}",
             "instruction_snapshot": s.instruction_snapshot,
             "created_at": s.created_at.isoformat(),
             "submitted_at": s.submitted_at.isoformat() if s.submitted_at else None,
         },
         "utterances": utterances,
+    }
+
+
+@router.post("/admin/sessions/{session_id}/speaker-review")
+async def confirm_speaker_review(
+    session_id: str,
+    body: SpeakerReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    user: Experimenter = Depends(get_current_user),
+):
+    stmt = (
+        select(Session)
+        .where(Session.id == session_id)
+        .options(selectinload(Session.utterances))
+    )
+    s = (await db.execute(stmt)).scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Not found")
+    if s.status != "speaker_review":
+        raise HTTPException(status_code=409, detail="Speaker review is already complete")
+
+    submitted_ids = [item.utterance_id for item in body.utterances]
+    expected_ids = {utterance.id for utterance in s.utterances}
+    if len(submitted_ids) != len(set(submitted_ids)):
+        raise HTTPException(status_code=422, detail="Each utterance must be submitted exactly once")
+    if set(submitted_ids) != expected_ids:
+        raise HTTPException(status_code=422, detail="Speaker review must include every utterance")
+
+    speaker_by_id = {item.utterance_id: item.speaker for item in body.utterances}
+    existing_targets = (await db.execute(
+        select(AnnotationTarget).where(AnnotationTarget.session_id == session_id)
+    )).scalars().all()
+    for target in existing_targets:
+        await db.execute(delete(Annotation).where(Annotation.target_id == target.id))
+    await db.execute(delete(AnnotationTarget).where(AnnotationTarget.session_id == session_id))
+
+    target_count = 0
+    for utterance in s.utterances:
+        utterance.speaker = speaker_by_id[utterance.id]
+        if utterance.speaker != "participant":
+            continue
+        targets = _create_targets_for_utterance(s, utterance)
+        db.add_all(targets)
+        target_count += len(targets)
+
+    s.access_token = generate_token()
+    s.status = "created"
+    await db.commit()
+
+    from app.config import get_settings
+    base = get_settings().public_base_url.rstrip("/")
+    return {
+        "ok": True,
+        "status": s.status,
+        "access_token": s.access_token,
+        "participant_url": f"{base}/a/{s.access_token}",
+        "target_count": target_count,
     }
 
 
@@ -180,6 +282,8 @@ async def reset_session(
     s = (await db.execute(select(Session).where(Session.id == session_id))).scalar_one_or_none()
     if not s:
         raise HTTPException(status_code=404, detail="Not found")
+    if s.status == "speaker_review":
+        raise HTTPException(status_code=409, detail="Complete speaker review before resetting")
     # 删除已有 annotation
     targets = (await db.execute(
         select(AnnotationTarget).where(AnnotationTarget.session_id == session_id)

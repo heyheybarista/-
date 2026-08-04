@@ -119,12 +119,10 @@ def main():
         print(f"   Session ID: {result.get('session_id', 'N/A')}")
         print(f"   被试编号: {result.get('external_participant_id', 'N/A')}")
         print(f"   标题: {result.get('title', 'N/A')}")
-        print(f"   可标注数: {result.get('target_count', 0)}")
-        print(f"\n🔗 链接:")
-        print(f"   被试端: {result.get('participant_url', 'N/A')}")
-        print(f"   主试端: {result.get('admin_url', 'N/A')}")
+        print(f"\n🔗 主试说话人审核:")
+        print(f"   {result.get('admin_url', 'N/A')}")
         print()
-        print("💡 提示：你可以在主试端复制被试链接进行演示")
+        print("💡 提示：确认主试话语后，页面才会生成被试链接")
 
     except requests.exceptions.HTTPError as e:
         print(f"❌ HTTP 错误: {e}")

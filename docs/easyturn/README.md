@@ -20,8 +20,12 @@ AutoDL / Easy-Turn :6006
         │ POST /api/pipeline/sessions
         ▼
 Render 停顿标注工具
-        ├── 被试端：/a/{access_token}
-        └── 主试端：/admin-sessions.html
+        │ 待确认说话人
+        ▼
+主试端：/admin-detail.html?id={session_id}
+        │ 确认并生成链接
+        ▼
+被试端：/a/{access_token}
 ```
 
 适配器监听 `final_transcription` 和（云端广播补丁提供的）`final_transcription_broadcast`。同一个 `result_id` 的较高 `revision` 会替换旧结果，因此跨话轮边界 pause 不会被重复或丢弃。
@@ -49,7 +53,7 @@ Render 停顿标注工具
 }
 ```
 
-`pauses` 是当前规范字段；`extra.pauses` 只为历史备份兼容。服务端会为每个 pause 创建一个 `annotation_target`，并用 `target_index` 保持句内顺序。
+`pauses` 是当前规范字段；`extra.pauses` 只为历史备份兼容。主试确认说话人后，服务端只为被试话语中的 pause 创建 `annotation_target`，并用 `target_index` 保持句内顺序。
 
 ## 操作要点
 
@@ -57,7 +61,8 @@ Render 停顿标注工具
 2. 在本地运行 `python easyturn_adapter.py`。Adapter 先连接 Easy-Turn，再提示输入第一轮的被试编号和对话标题；看到“信息已确认”后开始录音。需要自动化启动时，仍可使用 `--participant P001 --title "口语任务"` 跳过第一轮的交互输入。
 3. 输入 `submit` 时会先在 `data/easyturn_backups/` 写入备份，再把被试编号、对话标题和 utterances 一起请求 Render。
 4. 请求失败时不会清空当前 utterances；修复网络或服务后可再次输入 `submit`。
-5. 成功后才会清空当前轮次，并立即要求填写下一轮的被试编号和对话标题；完成后再开始下一轮录音。`clear` 只会手动丢弃当前轮次的转录，不会提交。
+5. 请求成功后，Adapter 打印主试说话人审核地址。主试勾选自己说的话并确认后，页面才生成被试链接；主试话语不需要被试标注。
+6. 成功后会清空当前轮次，并立即要求填写下一轮的被试编号和对话标题；完成后再开始下一轮录音。`clear` 只会手动丢弃当前轮次的转录，不会提交。
 
 历史备份可以用下面的命令重新提交：
 

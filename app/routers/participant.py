@@ -11,6 +11,14 @@ from app.utils import LABEL_HINTS
 router = APIRouter(tags=["participant"])
 
 
+def _ensure_speaker_review_complete(session: Session):
+    if session.status == "speaker_review":
+        raise HTTPException(
+            status_code=409,
+            detail="The experimenter has not finished speaker review",
+        )
+
+
 def _build_target_out(target: AnnotationTarget) -> dict:
     """Build the annotation target output dict (including the nested annotation if any)."""
     ann = target.annotation
@@ -50,6 +58,7 @@ async def get_participant_session(token: str, db: AsyncSession = Depends(get_db)
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    _ensure_speaker_review_complete(session)
 
     # First access transitions from "created" to "in_progress"
     if session.status == "created":
@@ -108,6 +117,7 @@ async def patch_annotation(
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    _ensure_speaker_review_complete(session)
     if session.status == "submitted":
         raise HTTPException(status_code=400, detail="Session already submitted")
 
@@ -168,6 +178,7 @@ async def submit_session(token: str, db: AsyncSession = Depends(get_db)):
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    _ensure_speaker_review_complete(session)
     if session.status == "submitted":
         return {"ok": True, "message": "Already submitted"}
 

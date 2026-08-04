@@ -9,6 +9,7 @@
   .nav { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
   .nav a { color: #2563eb; text-decoration: none; font-size: 14px; }
   .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  .status-dot.speaker_review { background: #2563eb; }
   .status-dot.created { background: #9ca3af; }
   .status-dot.in_progress { background: #f59e0b; }
   .status-dot.submitted { background: #10b981; }
@@ -19,8 +20,11 @@
     border: none;
     color: #2563eb;
     cursor: pointer;
-    padding: 0;
+    padding: 0 4px;
     text-decoration: underline;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
   }
   .ops button.danger { color: #dc2626; }
 </style>
@@ -74,17 +78,17 @@ function render(sessions) {
   if (!sessions.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
   empty.style.display = 'none';
   tbody.innerHTML = sessions.map(s => {
-    const statusMap = { created: '待打开', in_progress: '填写中', submitted: '已提交' };
+    const statusMap = { speaker_review: '待确认说话人', created: '待打开', in_progress: '填写中', submitted: '已提交' };
     const dotClass = s.status;
     const createdAt = new Date(s.created_at).toLocaleString('zh-CN');
     return `<tr>
       <td>${esc(s.external_participant_id || '-')}</td>
       <td>${esc(s.title || '-')}</td>
       <td><span class="status-dot ${dotClass}"></span>${statusMap[s.status] || s.status}</td>
-      <td>${s.completed_count}/${s.target_count}</td>
+      <td>${s.status === 'speaker_review' ? '待确认' : `${s.completed_count}/${s.target_count}`}</td>
       <td style="font-size:12px;">${createdAt}</td>
       <td class="ops">
-        <a href="/admin-detail.html?id=${esc(s.id)}">详情</a>
+        <a href="/admin-detail.html?id=${esc(s.id)}">${s.status === 'speaker_review' ? '标注说话人' : '详情'}</a>
         <button type="button" class="danger" onclick="deleteSession('${esc(s.id)}')">删除</button>
       </td>
     </tr>`;

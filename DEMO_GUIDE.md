@@ -65,15 +65,15 @@ python scripts/create_demo_session.py \
   --base-url https://ting-dun-biao-zhu-gong-ju.onrender.com \
   --token "你的PIPELINE_TOKEN"
 
-# 3. 在主试端复制被试链接
+# 3. 打开脚本输出的主试审核地址，确认说话人后复制被试链接
 ```
 
 ### 每次演示时
 1. 打开主试端：https://ting-dun-biao-zhu-gong-ju.onrender.com
 2. 登录（admin / admin）
 3. 找到「【演示会话】口语任务」
-4. 点击「详情」→「复制链接」
-5. 在另一个浏览器/手机打开被试端演示
+4. 首次创建时点击「标注说话人」，勾选主试话语并确认
+5. 点击「复制链接」，在另一个浏览器/手机打开被试端演示
 
 ### 演示后清理
 - 如果需要重新演示，可以在主试端点击「重置提交」

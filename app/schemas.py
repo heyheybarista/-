@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Literal, Optional
 from datetime import datetime
 
 
@@ -39,8 +39,8 @@ class CreateSessionRequest(BaseModel):
 
 class CreateSessionResponse(BaseModel):
     session_id: str
-    access_token: str
-    participant_url: str
+    access_token: Optional[str] = None
+    participant_url: Optional[str] = None
     admin_url: str
     target_count: int
     status: str
@@ -102,6 +102,15 @@ class SessionListItem(BaseModel):
     completed_count: int
     created_at: datetime
     submitted_at: Optional[datetime]
+
+
+class SpeakerReviewItem(BaseModel):
+    utterance_id: str
+    speaker: Literal["participant", "experimenter"]
+
+
+class SpeakerReviewRequest(BaseModel):
+    utterances: list[SpeakerReviewItem]
 
 
 class AdminLoginRequest(BaseModel):

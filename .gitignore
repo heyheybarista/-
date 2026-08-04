@@ -35,6 +35,7 @@ Thumbs.db
 *.bak
 easyturn_backup_*.json
 data/easyturn_backups/
+data/speaker-*.png
 
 # Local reference snapshots and planning notes
 .local-reference/

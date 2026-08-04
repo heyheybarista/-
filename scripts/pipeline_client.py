@@ -40,9 +40,8 @@ def main():
     resp.raise_for_status()
     result = resp.json()
     print(f"Session created: {result['session_id']}")
-    print(f"Participant URL: {result['participant_url']}")
-    print(f"Admin URL:      {result['admin_url']}")
-    print(f"Target count:   {result['target_count']}")
+    print(f"Speaker review: {result['admin_url']}")
+    print("Confirm the speakers there to generate the participant URL.")
     return result
 
 

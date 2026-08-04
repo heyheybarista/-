@@ -23,6 +23,30 @@
     background: #f9fafb;
   }
   .link-box .btn { white-space: nowrap; }
+  .speaker-review-note {
+    margin-top: 12px;
+    padding: 12px;
+    border-left: 3px solid #2563eb;
+    background: #eff6ff;
+    color: #1e3a5f;
+  }
+  .speaker-review-control {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .speaker-review-control input { width: 20px; height: 20px; accent-color: #2563eb; }
+  .speaker-review-control input:focus-visible,
+  .link-box input:focus-visible,
+  .btn:focus-visible { outline: 3px solid rgba(37,99,235,0.35); outline-offset: 2px; }
+  .review-actions { margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb; }
+  .review-actions .btn, .link-box .btn, #action-card .btn { min-height: 44px; }
+  .status-message { min-height: 24px; margin-top: 8px; font-size: 13px; color: #374151; }
+  .status-message.error { color: #b91c1c; }
 </style>
 </head>
 <body>
@@ -32,12 +56,12 @@
 </div>
 <div class="container">
   <div class="card" id="meta-card"></div>
-  <div class="card" id="dialogue-card"><h3>对话内容</h3><div id="dialogue-body"></div></div>
-  <div class="card" style="display:flex;gap:12px;flex-wrap:wrap;">
-    <button class="btn btn-primary" id="copy-link-btn" onclick="copyLink()">复制被试链接</button>
+  <div class="card" id="dialogue-card"><h3>对话内容</h3><div id="dialogue-body"></div><div id="review-actions"></div></div>
+  <div class="card" id="action-card" style="display:flex;gap:12px;flex-wrap:wrap;">
+    <button class="btn btn-primary" id="copy-link-btn" style="display:none;" onclick="copyLink()">复制被试链接</button>
     <button class="btn" onclick="exportData('json')">导出 JSON</button>
     <button class="btn" onclick="exportData('csv')">导出 CSV</button>
-    <button class="btn btn-danger" id="reset-btn" onclick="resetSession()">重置提交</button>
+    <button class="btn btn-danger" id="reset-btn" style="display:none;" onclick="resetSession()">重置提交</button>
     <button class="btn btn-danger" id="delete-btn" onclick="deleteSession()">删除会话</button>
   </div>
 </div>
@@ -49,24 +73,35 @@ async function load() {
   if (!id) return;
   const r = await fetch(`/api/admin/sessions/${id}`);
   if (r.status === 401) { window.location.href = '/admin-login.html'; return; }
+  if (!r.ok) {
+    document.getElementById('meta-card').innerHTML = '<p>会话加载失败，请返回列表后重试。</p>';
+    return;
+  }
   detail = await r.json();
   render();
 }
 
 function render() {
   const s = detail.session;
-  const statusMap = { created: '待打开', in_progress: '填写中', submitted: '已提交' };
+  const isReview = s.status === 'speaker_review';
+  const statusMap = { speaker_review: '待确认说话人', created: '待打开', in_progress: '填写中', submitted: '已提交' };
   const url = s.participant_url || '';
+  const linkHtml = isReview ? `
+    <div class="speaker-review-note">
+      <strong>说话人尚未确认</strong><br>
+      确认对话中的主试话语后，将在此处生成被试链接。
+    </div>` : `
+    <p style="margin-top:8px;font-weight:600;">被试链接</p>
+    <div class="link-box">
+      <input id="participant-url-input" type="text" readonly value="${esc(url)}" onclick="this.select()" aria-label="被试链接">
+      <button class="btn btn-primary" type="button" onclick="copyLink()">复制链接</button>
+    </div>
+    <p style="margin-top:6px;font-size:12px;color:#6b7280;">若一键复制失败，请点选上方链接后手动 Ctrl+C / 长按复制。</p>`;
   document.getElementById('meta-card').innerHTML = `
     <h3>会话信息</h3>
     <p>被试编号：${esc(s.external_participant_id || '-')} | 标题：${esc(s.title || '-')} | 状态：${esc(statusMap[s.status] || s.status)}</p>
     <p>创建：${new Date(s.created_at).toLocaleString('zh-CN')} | 提交：${s.submitted_at ? new Date(s.submitted_at).toLocaleString('zh-CN') : '-'}</p>
-    <p style="margin-top:8px;font-weight:600;">被试链接</p>
-    <div class="link-box">
-      <input id="participant-url-input" type="text" readonly value="${esc(url)}" onclick="this.select()">
-      <button class="btn btn-primary" type="button" onclick="copyLink()">复制链接</button>
-    </div>
-    <p style="margin-top:6px;font-size:12px;color:#6b7280;">若一键复制失败，请点选上方链接后手动 Ctrl+C / 长按复制。</p>
+    ${linkHtml}
   `;
 
   const body = document.getElementById('dialogue-body');
@@ -78,18 +113,72 @@ function render() {
           · 类别：${esc(t.annotation.category || '-')}
           · 描述：${esc(t.annotation.description || '-')}
           · 置信度：${t.annotation.confidence != null ? t.annotation.confidence : '-'}
-          · ${t.annotation.is_complete ? '✅完整' : '⚠未完成'}
+          · ${t.annotation.is_complete ? '完整' : '未完成'}
         </div>`;
       }
       return `<div style="margin-top:4px;font-size:12px;color:#d97706;">未填写 · ${esc(t.display_hint || t.label)}${t.required ? ' (必填)' : ''}</div>`;
     }).join('');
     const label = u.easyturn_label ? `<span class="badge badge-${esc(u.easyturn_label)}">${esc(u.easyturn_label)}</span>` : '';
     const speaker = u.speaker === 'experimenter' ? '主试' : '被试';
-    return `<div class="utterance utterance-${esc(u.speaker)}">
+    const reviewControl = isReview ? `<label class="speaker-review-control">
+      <input type="checkbox" class="speaker-checkbox" data-utterance-id="${esc(u.id)}" ${u.speaker === 'experimenter' ? 'checked' : ''} onchange="updateSpeakerPreview(this)">
+      <span>主试说的</span>
+    </label>` : '';
+    return `<div class="utterance utterance-${esc(u.speaker)}" data-utterance-id="${esc(u.id)}">
+      ${reviewControl}
       <div class="speaker-label ${esc(u.speaker)}">${speaker} · #${u.seq}</div>
       ${renderUtteranceText(u)}${label}${annHtml}
     </div>`;
   }).join('');
+
+  document.getElementById('review-actions').innerHTML = isReview ? `
+    <div class="review-actions">
+      <button class="btn btn-primary" id="confirm-speakers-btn" type="button" onclick="confirmSpeakers()">确认说话人并生成链接</button>
+      <p class="status-message" id="speaker-review-status" role="status" aria-live="polite"></p>
+    </div>` : '';
+  document.getElementById('copy-link-btn').style.display = isReview ? 'none' : '';
+  document.getElementById('reset-btn').style.display = isReview ? 'none' : '';
+}
+
+function updateSpeakerPreview(checkbox) {
+  const utterance = checkbox.closest('.utterance');
+  const speakerLabel = utterance.querySelector('.speaker-label');
+  const speaker = checkbox.checked ? 'experimenter' : 'participant';
+  utterance.classList.toggle('utterance-experimenter', checkbox.checked);
+  utterance.classList.toggle('utterance-participant', !checkbox.checked);
+  speakerLabel.className = `speaker-label ${speaker}`;
+  speakerLabel.textContent = `${checkbox.checked ? '主试' : '被试'} · ${speakerLabel.textContent.split('·').pop().trim()}`;
+}
+
+async function confirmSpeakers() {
+  const button = document.getElementById('confirm-speakers-btn');
+  const status = document.getElementById('speaker-review-status');
+  const utterances = Array.from(document.querySelectorAll('.speaker-checkbox')).map(checkbox => ({
+    utterance_id: checkbox.dataset.utteranceId,
+    speaker: checkbox.checked ? 'experimenter' : 'participant'
+  }));
+  const experimenterCount = utterances.filter(item => item.speaker === 'experimenter').length;
+  if (!confirm(`已标记 ${experimenterCount} 句话为主试话语。确认后将生成被试链接，且说话人不能再修改。`)) return;
+
+  button.disabled = true;
+  status.className = 'status-message';
+  status.textContent = '正在生成被试链接…';
+  try {
+    const r = await fetch(`/api/admin/sessions/${id}/speaker-review`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({utterances})
+    });
+    if (r.status === 401) { window.location.href = '/admin-login.html'; return; }
+    const result = await r.json();
+    if (!r.ok) throw new Error(typeof result.detail === 'string' ? result.detail : '确认失败');
+    status.textContent = `已生成链接，共 ${result.target_count} 个标注点。`;
+    await load();
+  } catch (error) {
+    status.className = 'status-message error';
+    status.textContent = `确认失败：${error.message}`;
+    button.disabled = false;
+  }
 }
 
 function renderUtteranceText(u) {
@@ -100,7 +189,7 @@ function renderUtteranceText(u) {
     if (!match) return esc(part);
     const seconds = parseFloat(match[1]);
     const level = seconds >= 0.80 ? 'long' : seconds >= 0.35 ? 'medium' : 'short';
-    return `<span class="pause-marker pause-${level}" title="停顿 ${match[1]}s">⏸ ${match[1]}s</span>`;
+    return `<span class="pause-marker pause-${level}" title="停顿 ${match[1]}s">停顿 ${match[1]}s</span>`;
   }).join('');
   return `<p>${inner}</p>`;
 }
