@@ -55,6 +55,9 @@ let sessionData = null;
 let debounceTimers = {};
 // Pending save promises keyed by targetId+field, so submit can flush them first
 const pendingSaves = {};
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const speechSupported = typeof SpeechRecognition === 'function';
+let activeSpeech = null;
 
 // ── API helpers ──────────────────────────────────
 const api = {
@@ -167,6 +170,113 @@ function updateProgress() {
   document.getElementById('submit-btn').disabled = done < total;
 }
 
+function setSpeechStatus(statusEl, text, isError = false) {
+  statusEl.textContent = text;
+  statusEl.classList.toggle('error', isError);
+}
+
+function appendSpeechText(current, transcript) {
+  const text = transcript.trim();
+  if (!text) return current;
+  const trimmed = current.trimEnd();
+  if (!trimmed) return text;
+  if (current !== trimmed) return current + text;
+  const lastCharacter = trimmed.slice(-1);
+  const punctuation = '，。！？；：、';
+  const separator = punctuation.includes(lastCharacter) ? '' : ' ';
+  return trimmed + separator + text;
+}
+
+function finishSpeech(state, message = '', isError = false) {
+  if (state.finished) return;
+  state.finished = true;
+  if (activeSpeech === state) activeSpeech = null;
+  state.button.classList.remove('listening');
+  state.button.setAttribute('aria-pressed', 'false');
+  state.button.textContent = '语音输入';
+  setSpeechStatus(state.status, message, isError);
+  state.resolveDone();
+}
+
+function stopSpeech(state) {
+  if (!state) return Promise.resolve();
+  state.userStopped = true;
+  try {
+    state.recognition.stop();
+  } catch (e) {
+    finishSpeech(state, '已停止');
+  }
+  return state.done;
+}
+
+async function toggleSpeech(textarea, button, status) {
+  if (activeSpeech && activeSpeech.textarea === textarea) {
+    await stopSpeech(activeSpeech);
+    return;
+  }
+  if (activeSpeech) await stopSpeech(activeSpeech);
+
+  let resolveDone;
+  const done = new Promise(resolve => { resolveDone = resolve; });
+  const recognition = new SpeechRecognition();
+  const state = {
+    recognition, textarea, button, status, done, resolveDone,
+    finished: false, userStopped: false
+  };
+  activeSpeech = state;
+  button.classList.add('listening');
+  button.setAttribute('aria-pressed', 'true');
+  button.textContent = '停止';
+  setSpeechStatus(status, '正在启动…');
+
+  recognition.lang = 'zh-CN';
+  recognition.interimResults = true;
+  recognition.continuous = true;
+  recognition.onstart = () => {
+    if (!state.finished) setSpeechStatus(status, '正在聆听…');
+  };
+  recognition.onresult = event => {
+    if (state.finished) return;
+    let finalTranscript = '';
+    let interimTranscript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalTranscript += transcript;
+      else interimTranscript += transcript;
+    }
+    if (finalTranscript.trim()) {
+      textarea.value = appendSpeechText(textarea.value, finalTranscript);
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    setSpeechStatus(status, interimTranscript.trim() ? `正在聆听：${interimTranscript.trim()}` : '正在聆听…');
+  };
+  recognition.onerror = event => {
+    if (state.finished) return;
+    if (state.userStopped && event.error === 'aborted') {
+      finishSpeech(state, '已停止');
+      return;
+    }
+    const messages = {
+      'not-allowed': '麦克风权限被拒绝，请在浏览器设置中允许麦克风。',
+      'service-not-allowed': '当前浏览器不允许使用语音识别服务。',
+      'audio-capture': '未检测到可用麦克风，请检查设备。',
+      network: '语音识别网络错误，请检查网络后重试。',
+      'no-speech': '没有识别到语音，请重试。',
+      'language-not-supported': '当前浏览器不支持中文语音识别。'
+    };
+    finishSpeech(state, messages[event.error] || '语音识别失败，请重试。', true);
+  };
+  recognition.onend = () => {
+    if (state.finished) return;
+    finishSpeech(state, state.userStopped ? '已停止' : '语音输入已结束');
+  };
+  try {
+    recognition.start();
+  } catch (e) {
+    finishSpeech(state, '无法启动语音输入，请重试。', true);
+  }
+}
+
 // ── Render ──────────────────────────────────────
 function render(data) {
   sessionData = data;
@@ -226,12 +336,20 @@ function render(data) {
   if (!isReadonly) {
     document.querySelectorAll('.annotation-form').forEach(form => {
       const targetId = form.dataset.targetId;
+      const textarea = form.querySelector('textarea');
       form.querySelector('select').addEventListener('change', e => {
         autoSave(targetId, 'category', e.target.value);
       });
-      form.querySelector('textarea').addEventListener('input', e => {
+      textarea.addEventListener('input', e => {
         autoSave(targetId, 'description', e.target.value);
       });
+      const speechButton = form.querySelector('.speech-input-btn');
+      if (speechButton) {
+        const speechStatus = form.querySelector('.speech-status');
+        speechButton.addEventListener('click', () => {
+          toggleSpeech(textarea, speechButton, speechStatus);
+        });
+      }
       form.querySelectorAll('.confidence-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           form.querySelectorAll('.confidence-btn').forEach(b => b.classList.remove('selected'));
@@ -263,7 +381,13 @@ function renderAnnotationForm(target, ann, readonly) {
     <label>原因类别</label>
     <select ${readonly?'disabled':''}>${catOptions}</select>
     <label>原因与心理过程</label>
-    <textarea rows="3" placeholder="请描述当时停顿的原因…" ${readonly?'disabled':''}>${escapeHtml(ann.description || '')}</textarea>
+    <div class="description-input">
+      <textarea rows="3" placeholder="请描述当时停顿的原因…" ${readonly?'disabled':''}>${escapeHtml(ann.description || '')}</textarea>
+      ${!readonly && speechSupported ? `<div class="speech-controls">
+        <button type="button" class="speech-input-btn" aria-label="使用语音输入原因与心理过程" aria-pressed="false">语音输入</button>
+        <span class="speech-status" role="status" aria-live="polite"></span>
+      </div>` : ''}
+    </div>
     <label>你在多大程度上确信该停顿原因的描述？1=完全不确信，7=完全确信</label>
     <div class="confidence-row">${confHtml}</div>
   </div>`;
@@ -274,6 +398,7 @@ async function handleSubmit() {
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
   try {
+    await stopSpeech(activeSpeech);
     // Flush any pending debounced saves before submitting
     await flushPendingSaves();
     await api.submit();

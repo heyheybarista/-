@@ -75,8 +75,7 @@ class EasyTurnAdapter:
                 })
                 print(f"✓ 已注册 client_id: {self.client_id}")
             print("=" * 60)
-            print("开始录音，说话内容会自动记录。")
-            print("录音结束后输入 'submit' 创建标注会话，或 'quit' 退出。")
+            print("连接已建立，请先在 Adapter 终端填写本轮录音信息。")
             print("=" * 60)
 
         @self.sio.on('disconnect')
@@ -432,31 +431,42 @@ class EasyTurnAdapter:
         print(f"✓ 数据已保存到: {path}")
         return path
 
-    def run_daemon(self, participant_id: str, title: str):
-        """常驻模式：持续运行，自动同步转录结果"""
-        self.participant_id = participant_id
-        self.session_title = title
+    def _configure_round(
+            self,
+            participant_id: Optional[str] = None,
+            title: Optional[str] = None):
+        """Collect and display metadata before a recording round starts."""
+        self.participant_id = participant_id or prompt_required("被试编号")
+        self.session_title = title or prompt_required("对话标题")
+        print("\n本轮录音信息")
+        print(f"  被试编号: {self.participant_id}")
+        print(f"  对话标题: {self.session_title}")
+        print("信息已确认，可以开始本轮录音。")
 
+    def run_daemon(
+            self,
+            participant_id: Optional[str] = None,
+            title: Optional[str] = None):
+        """常驻模式：持续运行，自动同步转录结果"""
         if not self.connect():
             return
 
-        print("\n" + "=" * 60)
-        print("常驻模式已启动")
-        print("=" * 60)
-        print(f"参与者: {self.participant_id}")
-        print(f"标题: {self.session_title}")
-        print()
-        print("在 Easy-Turn 页面录音，每条转录会自动记录并备份。")
-        print()
-        print("命令:")
-        print("  submit  - 创建标注会话并继续运行")
-        print("  save    - 保存 JSON 备份")
-        print("  clear   - 清空当前累积的 utterances")
-        print("  quit    - 退出脚本")
-        print("  Ctrl+C  - 快速退出（不创建会话）")
-        print("=" * 60 + "\n")
-
         try:
+            self._configure_round(participant_id, title)
+
+            print("\n" + "=" * 60)
+            print("常驻模式已启动")
+            print("=" * 60)
+            print("在 Easy-Turn 页面录音，每条转录会自动记录并备份。")
+            print()
+            print("命令:")
+            print("  submit  - 提交本轮并填写下一轮信息")
+            print("  save    - 保存 JSON 备份")
+            print("  clear   - 清空当前累积的 utterances")
+            print("  quit    - 退出脚本")
+            print("  Ctrl+C  - 快速退出（不创建会话）")
+            print("=" * 60 + "\n")
+
             while True:
                 try:
                     cmd = input("输入命令: ").strip().lower()
@@ -482,7 +492,9 @@ class EasyTurnAdapter:
                         self.utterances.clear()
                         self.sequence_counter = 0
                         self._result_groups.clear()
-                        print("\n已清空累积内容，可以开始下一轮录音")
+                        print("\n本轮已提交并清空。请填写下一轮录音信息。")
+                        print("若不再录音，可按 Ctrl+C 退出。")
+                        self._configure_round()
                         print("=" * 60 + "\n")
 
                     elif cmd == 'save':
@@ -516,7 +528,7 @@ class EasyTurnAdapter:
                     break
 
         except KeyboardInterrupt:
-            print("\n\n收到 Ctrl+C，快速退出（未创建会话）")
+            print("\n\n收到 Ctrl+C，退出 Adapter；尚未 submit 的当前内容未上传")
 
         finally:
             self.disconnect()
@@ -572,12 +584,6 @@ def main():
 
     args = parser.parse_args()
 
-    participant_id = args.participant or prompt_required("被试编号")
-    session_title = args.title or prompt_required("对话标题")
-    print("\n本轮录音信息")
-    print(f"  被试编号: {participant_id}")
-    print(f"  对话标题: {session_title}")
-
     # 尝试从环境变量或 .env 读取 token
     if args.token == "change-me":
         try:
@@ -598,8 +604,8 @@ def main():
     )
 
     adapter.run_daemon(
-        participant_id=participant_id,
-        title=session_title
+        participant_id=args.participant,
+        title=args.title
     )
 
 

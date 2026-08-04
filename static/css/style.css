@@ -22,6 +22,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft Ya
 .annotation-form { margin-top: 10px; padding: 12px; background: #fefce8; border-radius: 8px; border: 1px solid #fde68a; }
 .annotation-form label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 13px; }
 .annotation-form select, .annotation-form textarea { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; margin-bottom: 10px; }
+.description-input textarea { margin-bottom: 6px; }
+.speech-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 44px; margin-bottom: 10px; }
+.speech-input-btn { min-width: 76px; min-height: 44px; padding: 8px 12px; border: 1px solid #9ca3af; border-radius: 6px; background: #fff; color: #1f2937; cursor: pointer; font-size: 14px; }
+.speech-input-btn:hover { background: #f3f4f6; }
+.speech-input-btn.listening { border-color: #b91c1c; background: #fef2f2; color: #991b1b; }
+.speech-input-btn:focus-visible { outline: 3px solid rgba(37,99,235,0.35); outline-offset: 2px; }
+.speech-status { flex: 1 1 180px; min-height: 20px; font-size: 12px; color: #6b7280; }
+.speech-status.error { color: #b91c1c; }
 .confidence-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .confidence-btn { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #d1d5db; background: #fff; cursor: pointer; font-size: 14px; }
 .confidence-btn.selected { border-color: #2563eb; background: #dbeafe; font-weight: 700; }
@@ -31,4 +39,4 @@ th { font-size: 12px; text-transform: uppercase; color: #6b7280; }
 progress { width: 100%; height: 8px; border-radius: 4px; }
 progress::-webkit-progress-bar { background: #e5e7eb; border-radius: 4px; }
 progress::-webkit-progress-value { background: #2563eb; border-radius: 4px; }
-@media (max-width: 600px) { .container { padding: 8px; } .card { padding: 12px; } }
+@media (max-width: 600px) { .container { padding: 8px; } .card { padding: 12px; } .speech-status { flex-basis: 100%; } }

@@ -54,10 +54,10 @@ Render 停顿标注工具
 ## 操作要点
 
 1. 在 AutoDL 上启动 Easy-Turn，并建立 `ssh -L 6006:127.0.0.1:6006 ...` 隧道。
-2. 在本地运行 `python easyturn_adapter.py`，按提示输入被试编号和对话标题；完成输入后 Adapter 才会连接 Easy-Turn 并开始接收录音。需要自动化启动时，仍可使用 `--participant P001 --title "口语任务"` 跳过交互输入。
+2. 在本地运行 `python easyturn_adapter.py`。Adapter 先连接 Easy-Turn，再提示输入第一轮的被试编号和对话标题；看到“信息已确认”后开始录音。需要自动化启动时，仍可使用 `--participant P001 --title "口语任务"` 跳过第一轮的交互输入。
 3. 输入 `submit` 时会先在 `data/easyturn_backups/` 写入备份，再把被试编号、对话标题和 utterances 一起请求 Render。
 4. 请求失败时不会清空当前 utterances；修复网络或服务后可再次输入 `submit`。
-5. 成功后才会清空当前轮次，`clear` 才是手动丢弃当前内存数据的命令。
+5. 成功后才会清空当前轮次，并立即要求填写下一轮的被试编号和对话标题；完成后再开始下一轮录音。`clear` 只会手动丢弃当前轮次的转录，不会提交。
 
 历史备份可以用下面的命令重新提交：
 
