@@ -6,7 +6,10 @@ from app.database import get_db
 from app.models import Session, Utterance, GlobalSetting
 from app.schemas import CreateSessionRequest, CreateSessionResponse
 from app.auth import verify_pipeline_token
-from app.utils import generate_token, parse_easyturn, DEFAULT_ANNOTATABLE_LABELS, DEFAULT_INSTRUCTION
+from app.utils import (
+    generate_token, parse_easyturn, DEFAULT_ANNOTATABLE_LABELS,
+    DEFAULT_INSTRUCTION, LEGACY_DEFAULT_INSTRUCTION,
+)
 
 router = APIRouter()
 
@@ -30,6 +33,8 @@ async def create_session(req: CreateSessionRequest, db: AsyncSession = Depends(g
         else settings.get("annotatable_labels", DEFAULT_ANNOTATABLE_LABELS)
     )
     instruction = settings.get("instruction_text", DEFAULT_INSTRUCTION)
+    if instruction == LEGACY_DEFAULT_INSTRUCTION:
+        instruction = DEFAULT_INSTRUCTION
 
     session = Session(
         id=_new_id(),

@@ -16,7 +16,8 @@ from app.schemas import (
 from app.auth import get_current_user, require_admin, ADMIN_SESSION_KEY
 from app.utils import (
     generate_token, DEFAULT_INSTRUCTION, DEFAULT_ANNOTATABLE_LABELS,
-    DEFAULT_REASON_CATEGORIES, LABEL_HINTS, is_legacy_default_reason_categories,
+    DEFAULT_REASON_CATEGORIES, LABEL_HINTS, LEGACY_DEFAULT_INSTRUCTION,
+    is_legacy_default_reason_categories,
 )
 
 router = APIRouter(tags=["admin"])
@@ -32,7 +33,7 @@ async def _get_settings(db: AsyncSession) -> dict:
     """读取或初始化全局设置"""
     rows = (await db.execute(select(GlobalSetting))).scalars().all()
     store = {r.key: r.value for r in rows}
-    if "instruction_text" not in store:
+    if "instruction_text" not in store or store["instruction_text"] == LEGACY_DEFAULT_INSTRUCTION:
         store["instruction_text"] = DEFAULT_INSTRUCTION
     if "annotatable_labels" not in store:
         store["annotatable_labels"] = DEFAULT_ANNOTATABLE_LABELS

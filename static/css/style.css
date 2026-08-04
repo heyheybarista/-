@@ -17,18 +17,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft Ya
 .dialogue-heading { display: flex; align-items: baseline; padding: 4px 4px 12px; }
 .dialogue-heading h2 { font-size: 20px; line-height: 1.3; }
 .dialogue-thread { display: flex; flex-direction: column; gap: 12px; }
-.chat-row { display: flex; width: 100%; }
+.chat-row { display: flex; width: 100%; padding-inline: 10px; }
 .chat-row-experimenter { justify-content: flex-start; }
 .chat-row-participant { justify-content: flex-end; }
 .chat-bubble { position: relative; width: fit-content; max-width: min(88%, 680px); padding: 14px 16px; border: 1px solid; border-radius: 16px; box-shadow: 0 2px 6px rgba(15,23,42,0.08); overflow-wrap: anywhere; }
 .chat-bubble-experimenter { background: #f8fafc; border-color: #cbd5e1; border-top-left-radius: 6px; }
-.chat-bubble-participant { background: #eff6ff; border-color: #bfdbfe; border-top-right-radius: 6px; }
+.chat-bubble-experimenter::after, .chat-bubble-participant::after { content: ""; position: absolute; top: 18px; width: 0; height: 0; border-top: 8px solid transparent; border-bottom: 8px solid transparent; }
+.chat-bubble-experimenter::after { left: -9px; border-right: 10px solid #cbd5e1; }
+.chat-bubble-participant { background: #d1fae5; border-color: #6ee7b7; border-top-right-radius: 6px; }
+.chat-bubble-participant::after { right: -9px; border-left: 10px solid #6ee7b7; }
 .chat-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .utterance-seq { color: #64748b; font-size: 12px; }
 .chat-text p { margin: 0 0 8px; white-space: pre-wrap; line-height: 1.7; }
 .chat-text p:last-child { margin-bottom: 0; }
-.chat-bubble-participant .badge { margin-bottom: 8px; }
-.duration-note { color: #64748b; font-size: 12px; }
 .submission-notice { background: #ecfdf5; border: 1px solid #059669; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; text-align: center; color: #065f46; }
 #submit-btn { min-height: 44px; touch-action: manipulation; }
 .pause-marker { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; margin: 0 3px; vertical-align: middle; white-space: nowrap; }
@@ -52,7 +53,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft Ya
 .confidence-row { flex-wrap: wrap; }
 .target-label { margin-bottom: 8px; color: #92400e; font-size: 12px; }
 .chat-bubble-experimenter .chat-text { color: #1f2937; }
-.chat-bubble-participant .chat-text { color: #172554; }
+.chat-bubble-participant .chat-text { color: #064e3b; }
 .chat-bubble:focus-within { box-shadow: 0 0 0 3px rgba(37,99,235,0.16), 0 2px 6px rgba(15,23,42,0.08); }
 #app button:focus-visible, #app select:focus-visible, #app textarea:focus-visible { outline: 3px solid rgba(37,99,235,0.35); outline-offset: 2px; }
 table { width: 100%; border-collapse: collapse; }

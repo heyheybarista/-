@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import Session, Utterance, AnnotationTarget, Annotation
 from app.schemas import ParticipantSessionOut, UtteranceOut, AnnotationTargetOut, PatchAnnotationRequest
-from app.utils import LABEL_HINTS
+from app.utils import DEFAULT_INSTRUCTION, LABEL_HINTS, LEGACY_DEFAULT_INSTRUCTION
 
 router = APIRouter(tags=["participant"])
 
@@ -60,11 +60,20 @@ async def get_participant_session(token: str, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=404, detail="Session not found")
     _ensure_speaker_review_complete(session)
 
+    instruction = session.instruction_snapshot
+    instruction_changed = instruction == LEGACY_DEFAULT_INSTRUCTION
+    if instruction_changed:
+        instruction = DEFAULT_INSTRUCTION
+        session.instruction_snapshot = instruction
+
     # First access transitions from "created" to "in_progress"
+    was_created = session.status == "created"
     if session.status == "created":
         session.status = "in_progress"
         session.opened_at = datetime.now(timezone.utc)
+    if instruction_changed or was_created:
         await db.commit()
+    if was_created:
         await db.refresh(session)
 
     utterances_out = []
@@ -94,7 +103,7 @@ async def get_participant_session(token: str, db: AsyncSession = Depends(get_db)
         session_id=session.id,
         title=session.title,
         status=session.status,
-        instruction=session.instruction_snapshot,
+        instruction=instruction,
         utterances=utterances_out,
     )
 

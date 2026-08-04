@@ -8,7 +8,7 @@
 <style>
   .instruction-card { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
   .instruction-card summary { font-weight: 700; cursor: pointer; font-size: 15px; }
-  .instruction-body { margin-top: 8px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+  .instruction-body { margin-top: 8px; font-size: 15px; line-height: 1.7; white-space: pre-wrap; }
   .save-status { font-size: 12px; color: #6b7280; }
   .save-status.saved { color: #059669; }
   .save-status.saving { color: #d97706; }
@@ -306,16 +306,8 @@ function render(data) {
       const speakerName = u.speaker === 'experimenter' ? '主试' : '被试';
       html += `<article class="chat-row chat-row-${speakerClass}">
         <div class="chat-bubble chat-bubble-${speakerClass}">
-          <div class="chat-meta"><span class="speaker-label ${speakerClass}">${speakerName}</span><span class="utterance-seq">#${u.seq}</span></div>
-          <div class="chat-text">${renderUtteranceText(u)}</div>`;
-
-      // Badge
-      if (u.easyturn_label) {
-        html += `<span class="badge badge-${u.easyturn_label}">${u.easyturn_label}</span>`;
-      }
-      if (u.pause_duration_ms) {
-        html += ` <span class="duration-note">约 ${(u.pause_duration_ms/1000).toFixed(1)}s</span>`;
-      }
+          <div class="chat-meta"><span class="speaker-label ${speakerClass}">${speakerName}</span></div>
+          <div class="chat-text">${speakerClass === 'experimenter' ? renderPlainUtteranceText(u) : renderUtteranceText(u)}</div>`;
 
       // One annotation form for every pause target in this utterance.
       for (const t of (u.annotation_targets || [])) {
@@ -444,6 +436,10 @@ function renderUtteranceText(u) {
     return escapeHtml(part);
   }).join('');
   return `<p>${inner}</p>`;
+}
+
+function renderPlainUtteranceText(u) {
+  return `<p>${escapeHtml(u.text || '')}</p>`;
 }
 
 // ── Init ─────────────────────────────────────────
